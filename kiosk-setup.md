@@ -1,54 +1,84 @@
-1. The Correct Autostart Location for Trixie
-In Trixie, the user-specific autostart file should be located in ~/.config/labwc/. You likely need to create this directory.
+# Kiosk setup (Trixie / Wayland / labwc)
 
-Run these commands:
+## Option A: Systemd user service (recommended)
 
-```Bash
-# Create the directory if it doesn't exist
+You can **restart the kiosk without rebooting** with `systemctl --user restart weather-kiosk` or `./restart-kiosk.sh`.
+
+### 1. Install the service
+
+On the Pi, from the project directory:
+
+```bash
+cd ~/pi-weather-dashboard
+mkdir -p ~/.config/systemd/user
+cp weather-kiosk.service ~/.config/systemd/user/
+```
+
+If your user UID is **not** 1000 (check with `id -u`), edit the service file and change `1000` in `XDG_RUNTIME_DIR=/run/user/1000` to your UID:
+
+```bash
+nano ~/.config/systemd/user/weather-kiosk.service
+# Change 1000 to your UID in the Environment=XDG_RUNTIME_DIR= line
+```
+
+Reload systemd so it sees the new service:
+
+```bash
+systemctl --user daemon-reload
+```
+
+### 2. Use labwc autostart to start the service when the desktop loads
+
+```bash
 mkdir -p ~/.config/labwc
-```
-
-# Move or link your kiosk script there so it's managed by labwc
-# We will create a fresh one to ensure it's Wayland-compatible
-```Bash
-nano ~/.config/labwc/autostart
-```
-
-2. The Wayland-Optimized Autostart Script
-Wayland handles screen management differently than X11 (it doesn't use xset). Replace the content of your autostart file with this.
-
-Paste this into ~/.config/labwc/autostart:
-
-```Bash
-#!/bin/bash
-
-# 1. Give Docker a few seconds to spin up the Flask app
-sleep 8
-
-# 2. Launch Chromium with Wayland-specific flags for the 7" screen
-# Note: --ozone-platform=wayland is key for Trixie
-chromium-browser \
-  --kiosk \
-  --noerrdialogs \
-  --disable-infobars \
-  --ozone-platform=wayland \
-  --window-size=800,480 \
-  --window-position=0,0 \
-  http://localhost:5000 &
-```
-
-Make it executable:
-
-```Bash
+cp labwc-autostart ~/.config/labwc/autostart
 chmod +x ~/.config/labwc/autostart
 ```
 
-3. Handling Screen Blanking (The Wayland Way)
-Since xset won't work on Trixie's default Wayland setup, you handle "always-on" display settings through the Labwc configuration or the OS Power settings.
+### 3. Restart without rebooting
 
-The Easy Way: Go to Menu > Preferences > Raspberry Pi Configuration > Display and ensure "Screen Blanking" is Disabled. This is a persistent system setting that Trixie respects.
+From the Pi (terminal on the desktop or SSH as the same user):
 
-4. Why this is better for your Pi 4
-Zero Extra Services: We aren't adding a new systemd service or a heavy manager; we are simply dropping a script into the folder the desktop is already programmed to look at.
+```bash
+cd ~/pi-weather-dashboard
+./restart-kiosk.sh
+```
 
-Hardware Acceleration: Using the --ozone-platform=wayland flag ensures Chromium uses the Pi 4's GPU properly, which keeps your Tiny House dashboard snappy.
+Or directly:
+
+```bash
+systemctl --user restart weather-kiosk.service
+```
+
+Useful commands:
+
+- **Status:** `systemctl --user status weather-kiosk.service`
+- **Stop:** `systemctl --user stop weather-kiosk.service`
+- **Start:** `systemctl --user start weather-kiosk.service`
+- **Log (script output):** `cat /tmp/weather-kiosk.log`
+
+---
+
+## Option B: Script-only autostart (no systemd)
+
+If you prefer not to use a service, copy the kiosk script into labwc autostart:
+
+```bash
+mkdir -p ~/.config/labwc
+cp ~/pi-weather-dashboard/kiosk.sh ~/.config/labwc/autostart
+chmod +x ~/.config/labwc/autostart
+```
+
+To restart you would need to log out and back in, or reboot. There is no single “restart kiosk” command.
+
+---
+
+## Screen blanking
+
+Go to **Menu → Preferences → Raspberry Pi Configuration → Display** and set **Screen Blanking** to **Disabled** so the dashboard stays on.
+
+---
+
+## Why Wayland flags matter
+
+Using **`--ozone-platform=wayland`** in Chromium ensures it uses the Pi’s GPU correctly under labwc. The `weather-kiosk.service` and `kiosk.sh` already use the right flags.

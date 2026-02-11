@@ -1,0 +1,18 @@
+[Unit]
+Description=Pi Weather Dashboard kiosk (Chromium)
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+# Wayland: required for Chromium under labwc. If your user UID is not 1000, change below.
+Environment=WAYLAND_DISPLAY=wayland-1
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+# Run from project dir so paths in script work
+WorkingDirectory=%h/pi-weather-dashboard
+ExecStart=%h/pi-weather-dashboard/kiosk.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

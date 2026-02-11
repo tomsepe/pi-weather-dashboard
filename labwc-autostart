@@ -1,0 +1,11 @@
+#!/bin/bash
+# Start the weather kiosk as a systemd user service.
+# Install: copy this file to ~/.config/labwc/autostart and run: chmod +x ~/.config/labwc/autostart
+# (After installing the service: see kiosk-setup.md)
+
+# Pass Wayland env into the user's systemd so the service can use it
+export WAYLAND_DISPLAY
+export XDG_RUNTIME_DIR
+systemctl --user import-environment WAYLAND_DISPLAY XDG_RUNTIME_DIR 2>/dev/null || true
+
+systemctl --user start weather-kiosk.service
