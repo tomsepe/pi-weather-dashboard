@@ -1,0 +1,9 @@
+services:
+  weather-app:
+    build: .
+    container_name: pi_weather_dashboard
+    restart: always
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
