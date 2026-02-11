@@ -32,7 +32,7 @@ echo "Using: $CHROMIUM"
 # 3. Launch in kiosk mode (Wayland). Runs in foreground so script waits until
 #    Chromium exits—if you run this manually, the terminal won't return until you close the window.
 #    When the "Default Keyring" prompt appears, set a password once and enable "Unlock on login".
-#    GCM/registration_request errors in the log are harmless (Chromium phoning Google); ignore them.
+#    GCM registration errors are filtered from the log (harmless Chromium↔Google chatter).
 export WAYLAND_DEBUG=0
 "$CHROMIUM" \
   --kiosk \
@@ -43,6 +43,7 @@ export WAYLAND_DEBUG=0
   --ozone-platform=wayland \
   --window-size=800,480 \
   --window-position=0,0 \
-  http://127.0.0.1:5000
+  http://127.0.0.1:5000 \
+  2>&1 | grep -v "Registration response error message"
 
-echo "=== $(date) chromium exited (code $?) ==="
+echo "=== $(date) chromium exited (code ${PIPESTATUS[0]}) ==="
