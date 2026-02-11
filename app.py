@@ -4,8 +4,8 @@ import requests
 app = Flask(__name__)
 
 # CONFIGURATION
-STATION_ID = "YOUR_STATION_ID"
-API_KEY = "YOUR_WU_API_KEY"
+STATION_ID = "KORVENET36"
+API_KEY = "63fi33VZ"
 LAT_LON = "44.05,-123.35" # Veneta, OR
 
 @app.route('/')
