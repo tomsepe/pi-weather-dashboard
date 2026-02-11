@@ -31,14 +31,20 @@ echo "Using: $CHROMIUM"
 
 # 3. Launch in kiosk mode (Wayland). Runs in foreground so script waits until
 #    Chromium exits—if you run this manually, the terminal won't return until you close the window.
+#    Ephemeral profile + disabled components reduce GCM/push registration errors in logs.
 export WAYLAND_DEBUG=0
+CHROME_PROFILE=/tmp/weather-kiosk-chromium
+mkdir -p "$CHROME_PROFILE"
 "$CHROMIUM" \
   --kiosk \
   --noerrdialogs \
   --disable-infobars \
   --password-store=basic \
+  --user-data-dir="$CHROME_PROFILE" \
   --disable-background-networking \
   --disable-sync \
+  --disable-component-update \
+  --disable-features=PushMessaging \
   --ozone-platform=wayland \
   --window-size=800,480 \
   --window-position=0,0 \
