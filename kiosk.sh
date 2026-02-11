@@ -29,7 +29,8 @@ if [ -z "$CHROMIUM" ]; then
 fi
 echo "Using: $CHROMIUM"
 
-# 3. Launch in kiosk mode (Wayland)
+# 3. Launch in kiosk mode (Wayland). Runs in foreground so script waits until
+#    Chromium exits—if you run this manually, the terminal won't return until you close the window.
 export WAYLAND_DEBUG=0
 "$CHROMIUM" \
   --kiosk \
