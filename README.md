@@ -79,7 +79,7 @@ Trixie uses the **labwc** compositor. To make the dashboard launch on boot:
 * **Logs:** View the backend logs with docker logs \-f pi\_weather\_dashboard.  
 * **Network:** The dashboard uses 0.0.0.0 inside the container to allow Docker port forwarding to localhost:5000.  
 * **Screen Blanking:** Disable via *Raspberry Pi Configuration \> Display* to keep the dashboard on 24/7.
-* **Kiosk not displaying?** On Trixie (Wayland/labwc) the kiosk must use Chromium with \`--ozone-platform=wayland\`. Use the script in **Step 3** above in \`\~/.config/labwc/autostart\` (not a generic X11 script). Ensure the file is executable (\`chmod +x \~/.config/labwc/autostart\`) and that Docker is up before the desktop starts (the \`sleep 8\` gives the container time to be ready). You can copy the contents of \`kiosk.sh\` or follow \`kiosk-setup.md\` for the exact Wayland script. Reboot after changing autostart.
+* **Kiosk not displaying?** (1) Use the script in **Step 3** in \`\~/.config/labwc/autostart\` with \`chmod +x\` and reboot. (2) Set **Boot** to **Desktop** (or Desktop Autologin) in Raspberry Pi Configuration so labwc runs. (3) After reboot, check \`cat /tmp/weather-kiosk.log\` on the Pi for errors. (4) See **kiosk-debug.md** for step-by-step checks (autostart, manual run, Chromium install).
 
 ## **🎨 Future Customization**
 
