@@ -148,8 +148,19 @@ def forecast_10day():
     try:
         forecast, err = _fetch_forecast(10)
         if err is not None:
+            # 401/403 often means the API key doesn't include 10-day; fall back to 5-day
+            if hasattr(err, "__getitem__") and err[1] in (401, 403):
+                log.warning("10-day forecast not allowed (401/403). Falling back to 5-day.")
+                forecast, err = _fetch_forecast(5)
+                if err is not None:
+                    return err
+                return render_template(
+                    "dashboard_10day.html",
+                    forecast=forecast,
+                    forecast_note="Your API plan includes 5-day forecast. Showing 5 days.",
+                )
             return err
-        return render_template("dashboard_10day.html", forecast=forecast)
+        return render_template("dashboard_10day.html", forecast=forecast, forecast_note=None)
     except Exception as e:
         log.exception("Unexpected error in 10-day forecast")
         return _error_page(
