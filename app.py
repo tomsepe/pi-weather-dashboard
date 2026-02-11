@@ -106,6 +106,24 @@ def index():
             log.error("Forecast response is not JSON: %s", e)
             return _error_page("Invalid forecast response", "Not valid JSON.", 502)
 
+        # IBM docs: top-level keys are dayOfWeek, calendarDayTemperatureMax, calendarDayTemperatureMin, narrative (arrays)
+        if "dayOfWeek" not in forecast and isinstance(forecast, dict):
+            # Some responses wrap in a single key (e.g. daily or forecast)
+            for key in ("daily", "forecast", "daypart"):
+                if key in forecast and isinstance(forecast[key], dict):
+                    forecast = forecast[key]
+                    break
+        if "calendarDayTemperatureMax" not in forecast:
+            log.error(
+                "Forecast missing expected keys. Top-level keys: %s",
+                list(forecast.keys()) if isinstance(forecast, dict) else type(forecast).__name__,
+            )
+            return _error_page(
+                "Unexpected forecast format",
+                "API response shape changed. Check docker logs for keys.",
+                502,
+            )
+
         return render_template("dashboard.html", current=current, forecast=forecast)
 
     except requests.RequestException as e:

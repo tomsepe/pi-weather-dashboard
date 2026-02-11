@@ -34,8 +34,8 @@
             {% for i in range(1, 4) %}
             <div class="forecast-day">
                 <div class="day-name">{{ forecast.dayOfWeek[i] }}</div>
-                <div class="day-temps">H: {{ forecast.calendarDayHigh[i] }}° L: {{ forecast.calendarDayLow[i] }}°</div>
-                <div style="color:#aaa">{{ forecast.narrative[i][:40] }}...</div>
+                <div class="day-temps">H: {{ forecast.calendarDayTemperatureMax[i] }}° L: {{ forecast.calendarDayTemperatureMin[i] }}°</div>
+                <div style="color:#aaa">{% if forecast.narrative[i] %}{{ forecast.narrative[i][:40] }}{% if forecast.narrative[i]|length > 40 %}...{% endif %}{% endif %}</div>
             </div>
             {% endfor %}
         </div>
