@@ -16,13 +16,19 @@ A standalone, kiosk-mode weather station dashboard for the Raspberry Pi 4 \+ 7" 
 \#\# 📁 Project Structure  
 \`\`\`text  
 pi-weather-dashboard/  
-├── app.py                \# Flask application logic  
-├── docker-compose.yml     \# Docker service configuration  
-├── Dockerfile             \# Container build instructions  
-├── requirements.txt       \# Python dependencies  
+├── app.py                  \# Flask application logic  
+├── docker-compose.yaml     \# Docker service configuration  
+├── Dockerfile              \# Container build instructions  
+├── requirements.txt        \# Python dependencies  
 ├── templates/  
-│   └── dashboard.html     \# 800x480 optimized UI template  
-└── README.md              \# You are here
+│   └── dashboard.html       \# 800x480 optimized UI template  
+├── kiosk.sh                \# Kiosk launcher (Chromium, Wayland)  
+├── kiosk-setup.md           \# Kiosk install: systemd service + restart, or script-only  
+├── kiosk-debug.md           \# Step-by-step kiosk troubleshooting  
+├── weather-kiosk.service   \# Systemd user service (optional)  
+├── labwc-autostart          \# Autostart script that starts the service  
+├── restart-kiosk.sh        \# Restart kiosk without rebooting  
+└── README.md                \# You are here
 
 ## **🚀 Setup & Installation**
 
@@ -37,36 +43,22 @@ Ensure you have your **Weather Underground API Key** and **Station ID**. Update 
 
 Navigate to the project directory and start the Docker container:
 
-Bash
-
+\`\`\`bash  
 cd \~/pi-weather-dashboard  
-docker-compose up \-d
+docker-compose up \-d  
+\`\`\`
 
 The dashboard will be available at http://localhost:5000.
 
 ### **3\. Configure Kiosk Mode (Trixie/Wayland)**
 
-Trixie uses the **labwc** compositor. To make the dashboard launch on boot:
+Trixie uses the **labwc** compositor. Full steps are in **kiosk-setup.md**. Summary:
 
-1. Create the autostart directory:  
-   Bash  
-   mkdir \-p \~/.config/labwc
-
-2. Create/edit the autostart file: nano \~/.config/labwc/autostart  
-3. Add the following script:  
-   Bash  
-   \#\!/bin/bash  
-   sleep 8  
-   chromium-browser \\  
-     \--kiosk \\  
-     \--noerrdialogs \\  
-     \--disable-infobars \\  
-     \--ozone-platform=wayland \\  
-     \--window-size=800,480 \\  
-     \--window-position=0,0 \\  
-     http://localhost:5000 &
-
-4. Ensure it is executable: chmod \+x \~/.config/labwc/autostart
+* **Option A (recommended):** Install the **systemd user service** so you can restart the kiosk without rebooting:
+  * Copy \`weather-kiosk.service\` to \`\~/.config/systemd/user/\`, run \`systemctl --user daemon-reload\`.
+  * Copy \`labwc-autostart\` to \`\~/.config/labwc/autostart\` and \`chmod +x\` it.
+  * Restart kiosk anytime: \`./restart-kiosk.sh\` or \`systemctl --user restart weather-kiosk.service\`.
+* **Option B:** Copy \`kiosk.sh\` to \`\~/.config/labwc/autostart\` and \`chmod +x\` it (no service; no restart command).
 
 ## **🖥 Dashboard Layout**
 
@@ -76,10 +68,12 @@ Trixie uses the **labwc** compositor. To make the dashboard launch on boot:
 
 ## **🛠 Troubleshooting**
 
-* **Logs:** View the backend logs with docker logs \-f pi\_weather\_dashboard.  
-* **Network:** The dashboard uses 0.0.0.0 inside the container to allow Docker port forwarding to localhost:5000.  
-* **Screen Blanking:** Disable via *Raspberry Pi Configuration \> Display* to keep the dashboard on 24/7.
-* **Kiosk not displaying?** (1) Use the script in **Step 3** in \`\~/.config/labwc/autostart\` with \`chmod +x\` and reboot. (2) Set **Boot** to **Desktop** (or Desktop Autologin) in Raspberry Pi Configuration so labwc runs. (3) After reboot, check \`cat /tmp/weather-kiosk.log\` on the Pi for errors. (4) See **kiosk-debug.md** for step-by-step checks (autostart, manual run, Chromium install).
+* **Backend logs:** \`docker logs -f pi_weather_dashboard\` — API errors and missing \`observations\` are logged here.  
+* **Weather API / "No observations":** If the dashboard shows "Weather data unavailable", check the backend logs for the API response. Often invalid API key or station ID; fix in \`app.py\` and restart the container (\`docker-compose restart\`).  
+* **Kiosk log:** On the Pi, \`cat /tmp/weather-kiosk.log\` — Chromium and script output.  
+* **Kiosk not displaying?** Boot must be **Desktop** (or Desktop Autologin). See **kiosk-debug.md** for autostart, manual run, keyring popup, and Chromium install.  
+* **Restart kiosk without reboot:** Use the systemd service (Option A in Step 3), then \`./restart-kiosk.sh\` or \`systemctl --user restart weather-kiosk.service\`.  
+* **Screen blanking:** Disable via *Raspberry Pi Configuration \> Display* to keep the dashboard on 24/7.
 
 ## **🎨 Future Customization**
 
