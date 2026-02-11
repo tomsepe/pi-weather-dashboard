@@ -36,6 +36,8 @@ export WAYLAND_DEBUG=0
   --noerrdialogs \
   --disable-infobars \
   --password-store=basic \
+  --disable-background-networking \
+  --disable-sync \
   --ozone-platform=wayland \
   --window-size=800,480 \
   --window-position=0,0 \
