@@ -21,6 +21,46 @@ def _mask_key(key: str) -> str:
     return "*" * (len(key) - 4) + key[-4:]
 
 
+def _fetch_forecast(days: int):
+    """Fetch daily forecast (5 or 10 day). Returns (forecast_dict, None) or (None, error_response)."""
+    if days not in (5, 10):
+        return None, _error_page("Bad request", "Invalid forecast days.", 400)
+    forecast_url = (
+        f"https://api.weather.com/v3/wx/forecast/daily/{days}day?"
+        f"geocode={LAT_LON}&format=json&units=e&language=en-US&apiKey={API_KEY}"
+    )
+    log.info("Fetching %d-day forecast", days)
+    resp = requests.get(forecast_url, timeout=10)
+    if resp.status_code != 200:
+        log.error("Forecast API returned status %s: %s", resp.status_code, resp.text[:500])
+        return None, _error_page(
+            "Forecast API error",
+            f"Server returned {resp.status_code}. Check docker logs.",
+            resp.status_code,
+        )
+    try:
+        forecast = resp.json()
+    except Exception as e:
+        log.error("Forecast response is not JSON: %s", e)
+        return None, _error_page("Invalid forecast response", "Not valid JSON.", 502)
+    if "dayOfWeek" not in forecast and isinstance(forecast, dict):
+        for key in ("daily", "forecast", "daypart"):
+            if key in forecast and isinstance(forecast[key], dict):
+                forecast = forecast[key]
+                break
+    if "calendarDayTemperatureMax" not in forecast:
+        log.error(
+            "Forecast missing expected keys. Top-level keys: %s",
+            list(forecast.keys()) if isinstance(forecast, dict) else type(forecast).__name__,
+        )
+        return None, _error_page(
+            "Unexpected forecast format",
+            "API response shape changed. Check docker logs.",
+            502,
+        )
+    return forecast, None
+
+
 @app.route("/")
 def index():
     try:
@@ -80,49 +120,10 @@ def index():
 
         current = obs_list[0]
 
-        # 2. Local forecast
-        forecast_url = (
-            f"https://api.weather.com/v3/wx/forecast/daily/5day?"
-            f"geocode={LAT_LON}&format=json&units=e&language=en-US&apiKey={API_KEY}"
-        )
-        log.info("Fetching forecast")
-        forecast_resp = requests.get(forecast_url, timeout=10)
-
-        if forecast_resp.status_code != 200:
-            log.error(
-                "Forecast API returned status %s: %s",
-                forecast_resp.status_code,
-                forecast_resp.text[:500],
-            )
-            return _error_page(
-                "Forecast API error",
-                f"Forecast server returned {forecast_resp.status_code}. Check docker logs.",
-                forecast_resp.status_code,
-            )
-
-        try:
-            forecast = forecast_resp.json()
-        except Exception as e:
-            log.error("Forecast response is not JSON: %s", e)
-            return _error_page("Invalid forecast response", "Not valid JSON.", 502)
-
-        # IBM docs: top-level keys are dayOfWeek, calendarDayTemperatureMax, calendarDayTemperatureMin, narrative (arrays)
-        if "dayOfWeek" not in forecast and isinstance(forecast, dict):
-            # Some responses wrap in a single key (e.g. daily or forecast)
-            for key in ("daily", "forecast", "daypart"):
-                if key in forecast and isinstance(forecast[key], dict):
-                    forecast = forecast[key]
-                    break
-        if "calendarDayTemperatureMax" not in forecast:
-            log.error(
-                "Forecast missing expected keys. Top-level keys: %s",
-                list(forecast.keys()) if isinstance(forecast, dict) else type(forecast).__name__,
-            )
-            return _error_page(
-                "Unexpected forecast format",
-                "API response shape changed. Check docker logs for keys.",
-                502,
-            )
+        # 2. Local forecast (5 day)
+        forecast, err = _fetch_forecast(5)
+        if err is not None:
+            return err
 
         return render_template("dashboard.html", current=current, forecast=forecast)
 
@@ -135,6 +136,22 @@ def index():
         )
     except Exception as e:
         log.exception("Unexpected error")
+        return _error_page(
+            "Server error",
+            str(e) + " Check docker logs for full traceback.",
+            500,
+        )
+
+
+@app.route("/10day")
+def forecast_10day():
+    try:
+        forecast, err = _fetch_forecast(10)
+        if err is not None:
+            return err
+        return render_template("dashboard_10day.html", forecast=forecast)
+    except Exception as e:
+        log.exception("Unexpected error in 10-day forecast")
         return _error_page(
             "Server error",
             str(e) + " Check docker logs for full traceback.",
