@@ -7,8 +7,10 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
 # CONFIGURATION
+# Get a valid PWS API key from https://www.wunderground.com/member/api-keys (or your
+# weather.com developer account). 401 "Invalid apiKey" in logs means replace API_KEY below.
 STATION_ID = "KORVENET36"
-API_KEY = "63fi33VZ"
+API_KEY = "5eb5da180a394e26b5da180a397e267f"  # Replace with your valid key
 LAT_LON = "44.05,-123.35"  # Veneta, OR
 
 

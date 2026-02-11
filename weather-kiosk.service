@@ -5,10 +5,10 @@ PartOf=graphical-session.target
 
 [Service]
 Type=simple
-# Wayland: required for Chromium under labwc. If your user UID is not 1000, change below.
-Environment=WAYLAND_DISPLAY=wayland-1
-Environment=XDG_RUNTIME_DIR=/run/user/1000
-# Run from project dir so paths in script work
+# Wayland: do NOT set WAYLAND_DISPLAY/XDG_RUNTIME_DIR here. labwc-autostart must
+# run first and call: systemctl --user import-environment WAYLAND_DISPLAY XDG_RUNTIME_DIR
+# so this service inherits the real session's display. Otherwise Chromium fails with
+# "Failed to connect to Wayland display".
 WorkingDirectory=%h/pi-weather-dashboard
 ExecStart=%h/pi-weather-dashboard/kiosk.sh
 Restart=on-failure

@@ -14,13 +14,6 @@ mkdir -p ~/.config/systemd/user
 cp weather-kiosk.service ~/.config/systemd/user/
 ```
 
-If your user UID is **not** 1000 (check with `id -u`), edit the service file and change `1000` in `XDG_RUNTIME_DIR=/run/user/1000` to your UID:
-
-```bash
-nano ~/.config/systemd/user/weather-kiosk.service
-# Change 1000 to your UID in the Environment=XDG_RUNTIME_DIR= line
-```
-
 Reload systemd so it sees the new service:
 
 ```bash
