@@ -46,7 +46,18 @@
 (function() {
     if (!document.getElementById('controls')) return;
     var POLL_SEC = 15;
-    var DOMAINS = ['light', 'switch'];
+    var DOMAINS = ['light', 'switch', 'fan'];
+    var EXCLUDED = ['Security Camera', 'pi-tinyhouse', 'pi-respeaker'];
+
+    function isExcluded(state) {
+        var name = (state.attributes && state.attributes.friendly_name) || '';
+        var id = (state.entity_id || '').toLowerCase();
+        var nameLower = name.toLowerCase();
+        return EXCLUDED.some(function(x) {
+            var xl = x.toLowerCase();
+            return nameLower.indexOf(xl) !== -1 || id.indexOf(xl) !== -1;
+        });
+    }
 
     function showError(msg) {
         var el = document.getElementById('error');
@@ -57,8 +68,9 @@
     function renderStates(states) {
         var container = document.getElementById('controls');
         var loading = document.getElementById('loading');
-        if (!states || states.length === 0) {
-            loading.textContent = 'No lights or switches found.';
+        states = (states || []).filter(function(s) { return !isExcluded(s); });
+        if (states.length === 0) {
+            loading.textContent = 'No lights or fans found.';
             container.style.display = 'none';
             return;
         }
