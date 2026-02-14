@@ -1,4 +1,5 @@
-from flask import Flask, render_template
+import os
+from flask import Flask, render_template, request, jsonify
 import requests
 import logging
 
@@ -12,6 +13,14 @@ log = logging.getLogger(__name__)
 STATION_ID = "KORVENET36"
 API_KEY = "5eb5da180a394e26b5da180a397e267f"  # Replace with your valid key
 LAT_LON = "44.05,-123.35"  # Veneta, OR
+
+# Home Assistant: long-lived token at http://HA_URL/profile; token stays server-side.
+HA_URL = (os.environ.get("HA_URL") or "").rstrip("/")
+HA_ACCESS_TOKEN = os.environ.get("HA_ACCESS_TOKEN") or ""
+
+
+def _ha_configured() -> bool:
+    return bool(HA_URL and HA_ACCESS_TOKEN)
 
 
 def _mask_key(key: str) -> str:
@@ -168,6 +177,79 @@ def forecast_10day():
             str(e) + " Check docker logs for full traceback.",
             500,
         )
+
+
+# --- Home Assistant proxy (token never sent to browser) ---
+
+def _ha_headers():
+    return {
+        "Authorization": f"Bearer {HA_ACCESS_TOKEN}",
+        "Content-Type": "application/json",
+    }
+
+
+@app.route("/api/ha/states")
+def ha_states():
+    """Proxy GET /api/states from HA; optional ?domain=light,switch to filter."""
+    if not _ha_configured():
+        return jsonify({"error": "HA not configured"}), 503
+    url = f"{HA_URL}/api/states"
+    try:
+        r = requests.get(url, headers=_ha_headers(), timeout=10)
+        r.raise_for_status()
+        states = r.json()
+        if not isinstance(states, list):
+            return jsonify({"error": "Unexpected HA response"}), 502
+        domains = request.args.get("domain")
+        if domains:
+            allowed = {d.strip().lower() for d in domains.split(",") if d.strip()}
+            states = [s for s in states if s.get("entity_id", "").split(".")[0] in allowed]
+        return jsonify(states)
+    except requests.RequestException as e:
+        log.exception("HA states request failed")
+        return jsonify({"error": str(e)}), 502
+    except Exception as e:
+        log.exception("HA states error")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/ha/service", methods=["POST"])
+def ha_service():
+    """Proxy POST to HA /api/services/<domain>/<service> with JSON body."""
+    if not _ha_configured():
+        return jsonify({"error": "HA not configured"}), 503
+    data = request.get_json(silent=True) or {}
+    domain = (data.get("domain") or "").strip()
+    service = (data.get("service") or "").strip()
+    body = data.get("data") or {}
+    if not domain or not service:
+        return jsonify({"error": "domain and service required"}), 400
+    url = f"{HA_URL}/api/services/{domain}/{service}"
+    try:
+        r = requests.post(url, headers=_ha_headers(), json=body, timeout=10)
+        if r.status_code >= 400:
+            log.warning("HA service %s/%s returned %s: %s", domain, service, r.status_code, r.text[:200])
+            return jsonify({"error": r.text or f"HA returned {r.status_code}"}), r.status_code
+        try:
+            body = r.json() if r.content else {}
+        except ValueError:
+            body = {}
+        return jsonify(body), r.status_code
+    except requests.RequestException as e:
+        log.exception("HA service request failed")
+        return jsonify({"error": str(e)}), 502
+    except Exception as e:
+        log.exception("HA service error")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/ha")
+def ha_dashboard():
+    """Third page: Home Assistant controls. Token not in template."""
+    return render_template(
+        "dashboard_ha.html",
+        ha_configured=_ha_configured(),
+    )
 
 
 def _error_page(title: str, detail: str, status: int = 500) -> tuple:
