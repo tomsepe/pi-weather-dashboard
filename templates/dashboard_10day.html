@@ -18,6 +18,10 @@
     <meta http-equiv="refresh" content="300">
 </head>
 <body>
+    <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/10day" class="active">5 Day</a>
+    </nav>
     <div class="header">Veneta 10-Day Forecast</div>
     {% if forecast_note %}
     <div class="forecast-note">{{ forecast_note }}</div>
@@ -31,9 +35,5 @@
         </div>
         {% endfor %}
     </div>
-    <nav class="nav">
-        <a href="/">Home</a>
-        <a href="/10day" class="active">10 Day</a>
-    </nav>
 </body>
 </html>
