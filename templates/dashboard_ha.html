@@ -52,7 +52,7 @@
     if (!document.getElementById('controls')) return;
     var POLL_SEC = 15;
     var DOMAINS = ['light', 'switch', 'fan'];
-    var EXCLUDED = ['Security Camera', 'pi-tinyhouse', 'pi-respeaker'];
+    var EXCLUDED = ['Security Camera', 'pi-tinyhouse', 'pi-respeaker', 'assist'];
 
     function isExcluded(state) {
         var name = (state.attributes && state.attributes.friendly_name) || '';
