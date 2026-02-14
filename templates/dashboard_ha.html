@@ -19,6 +19,11 @@
         .control-card button:hover { background: #ff9f0a; color: #000; }
         .control-card button:disabled { opacity: 0.5; cursor: not-allowed; }
         .control-card button.active { background: #ff9f0a; color: #000; }
+        .control-card .brightness { width: 100%; margin-top: 4px; }
+        .control-card .brightness label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; }
+        .control-card input[type="range"] { width: 100%; height: 8px; -webkit-appearance: none; appearance: none; background: #333; border-radius: 4px; outline: none; }
+        .control-card input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #ff9f0a; cursor: pointer; }
+        .control-card input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: #ff9f0a; cursor: pointer; border: none; }
         .error-msg { color: #c00; padding: 10px 0; }
         .loading { color: #888; padding: 20px; }
     </style>
@@ -83,16 +88,25 @@
             var name = (s.attributes && s.attributes.friendly_name) || entityId;
             var state = (s.state || '').toLowerCase();
             var isOn = state === 'on';
+            var brightness = (s.attributes && s.attributes.brightness != null) ? s.attributes.brightness : 255;
+            var brightnessPct = Math.round((brightness / 255) * 100);
+            if (!isOn) brightnessPct = 0;
             var card = document.createElement('div');
             card.className = 'control-card';
             card.setAttribute('data-entity-id', entityId);
+            var sliderHtml = (domain === 'light') ?
+                '<div class="brightness">' +
+                '<label>Brightness ' + brightnessPct + '%</label>' +
+                '<input type="range" min="0" max="100" value="' + brightnessPct + '" data-entity-id="' + escapeHtml(entityId) + '">' +
+                '</div>' : '';
             card.innerHTML =
                 '<span class="name">' + escapeHtml(name) + '</span>' +
                 '<span class="state">' + escapeHtml(state) + '</span>' +
                 '<div class="buttons">' +
                 '<button type="button" data-action="turn_on" ' + (isOn ? 'class="active"' : '') + '>On</button>' +
                 '<button type="button" data-action="turn_off" ' + (!isOn ? 'class="active"' : '') + '>Off</button>' +
-                '</div>';
+                '</div>' +
+                sliderHtml;
             container.appendChild(card);
         });
         container.querySelectorAll('button').forEach(function(btn) {
@@ -102,6 +116,25 @@
                 var domain = entityId.split('.')[0];
                 var action = this.getAttribute('data-action');
                 callService(domain, action, { entity_id: entityId });
+            });
+        });
+        var sliderTimeout = {};
+        container.querySelectorAll('input[type="range"]').forEach(function(slider) {
+            var entityId = slider.getAttribute('data-entity-id');
+            var label = slider.previousElementSibling;
+            function sendBrightness() {
+                var pct = parseInt(slider.value, 10);
+                if (pct === 0) {
+                    callService('light', 'turn_off', { entity_id: entityId });
+                } else {
+                    callService('light', 'turn_on', { entity_id: entityId, brightness_pct: pct });
+                }
+            }
+            slider.addEventListener('input', function() {
+                if (label) label.textContent = 'Brightness ' + slider.value + '%';
+                var id = entityId;
+                clearTimeout(sliderTimeout[id]);
+                sliderTimeout[id] = setTimeout(sendBrightness, 200);
             });
         });
     }
