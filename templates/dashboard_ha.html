@@ -18,6 +18,7 @@
         .control-card button:hover { background: #ff9f0a; color: #000; }
         .control-card button:disabled { opacity: 0.5; cursor: not-allowed; }
         .control-card button.active { background: #ff9f0a; color: #000; }
+        .control-card button.active2 { background: #ff0000; color: #000; }
         .control-card .brightness { width: 100%; margin-top: 3px; }
         .control-card .brightness label { display: block; font-size: 9.6px; color: #888; margin-bottom: 3px; }
         .control-card input[type="range"] { width: 100%; height: 6px; -webkit-appearance: none; appearance: none; background: #333; border-radius: 3px; outline: none; }
@@ -100,7 +101,7 @@
                 '<span class="name">' + escapeHtml(name) + '</span>' +
                 '<div class="buttons">' +
                 '<button type="button" data-action="turn_on" ' + (isOn ? 'class="active"' : '') + '>On</button>' +
-                '<button type="button" data-action="turn_off" ' + (!isOn ? 'class="active"' : '') + '>Off</button>' +
+                '<button type="button" data-action="turn_off" ' + (!isOn ? 'class="active2"' : '') + '>Off</button>' +
                 '</div>' +
                 sliderHtml;
             container.appendChild(card);
