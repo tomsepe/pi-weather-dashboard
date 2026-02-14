@@ -86,8 +86,7 @@
             var entityId = s.entity_id || '';
             var domain = entityId.split('.')[0];
             var name = (s.attributes && s.attributes.friendly_name) || entityId;
-            var state = (s.state || '').toLowerCase();
-            var isOn = state === 'on';
+            var isOn = (s.state || '').toLowerCase() === 'on';
             var brightness = (s.attributes && s.attributes.brightness != null) ? s.attributes.brightness : 255;
             var brightnessPct = Math.round((brightness / 255) * 100);
             if (!isOn) brightnessPct = 0;
@@ -101,7 +100,6 @@
                 '</div>' : '';
             card.innerHTML =
                 '<span class="name">' + escapeHtml(name) + '</span>' +
-                '<span class="state">' + escapeHtml(state) + '</span>' +
                 '<div class="buttons">' +
                 '<button type="button" data-action="turn_on" ' + (isOn ? 'class="active"' : '') + '>On</button>' +
                 '<button type="button" data-action="turn_off" ' + (!isOn ? 'class="active"' : '') + '>Off</button>' +
