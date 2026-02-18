@@ -31,6 +31,8 @@ pi-weather-dashboard/
 
 ---
 ## **2. Setup Static IP for Networking:**
+Recomend this as it makes for a faster startup and you always know how to get to your pi.
+
 ```BASH
 sudo nmcli device wifi list
 sudo nmcli c show
@@ -41,7 +43,7 @@ Get the network device name, i.e  "RR_IoT" "RR_Home"
 
 ### For static IP:
 ```BASH
-sudo nmcli connection modify "netplan-wlan0-RR_IoT" ipv4.addresses 192.168.30.100/24
+sudo nmcli connection modify "netplan-wlan0-RR_IoT" ipv4.addresses 192.168.30.102/24
 sudo nmcli connection modify "netplan-wlan0-RR_IoT" ipv4.gateway 192.168.30.1
 sudo nmcli connection modify "netplan-wlan0-RR_IoT" ipv4.dns 192.168.30.1
 sudo nmcli connection modify "netplan-wlan0-RR_IoT" ipv4.method manual
