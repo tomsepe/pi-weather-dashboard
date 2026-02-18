@@ -95,7 +95,8 @@ Trixie uses the **labwc** compositor. Full details are in **kiosk-setup.md**. Fo
 * **Weather API "No observations":** If the dashboard shows "Weather data unavailable", check the backend logs for the API response. Often invalid API key or station ID; fix in `app.py` and restart the container (`docker-compose restart`).  
 * **Kiosk log:** On the Pi, `cat /tmp/weather-kiosk.log` — Chromium and script output.  
 * **Kiosk not displaying?** Boot must be **Desktop** (or Desktop Autologin). See **kiosk-debug.md** for autostart, manual run, keyring popup, and Chromium install.  
-* **Restart kiosk without reboot:** Use the systemd service (Option A in Step 3), then `./restart-kiosk.sh` or `systemctl --user restart weather-kiosk.service`.  
+* **Restart kiosk without reboot:** Use the systemd service (Option A in Step 3). Run `./restart-kiosk.sh` from a **terminal on the Pi desktop** (not SSH) so the restarted browser has Wayland. The script shows service status and the last 20 lines of the kiosk log.
+* **Browser doesn’t relaunch after restart:** See **kiosk-setup.md** (“If the browser doesn’t relaunch after restart”). Check `cat /tmp/weather-kiosk.log` for `WAYLAND_DISPLAY` (should be set) and any errors after “Launching Chromium...”.  
 * **Screen blanking:** Disable via *Raspberry Pi Configuration > Display* to keep the dashboard on 24/7.
 
 ## **🎨 Future Customization**
