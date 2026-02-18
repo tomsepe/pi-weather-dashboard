@@ -77,6 +77,42 @@ Ensure you have your **Weather Underground API Key** and **Station ID**. Update 
 * STATION_ID: Your Vevor station identifier.  
 * API_KEY: Your personal PWS API key.
 
+---
+## A) Docker Compose (recommended):
+
+[](https://github.com/tomsepe/linux-voice-assistant/blob/pi4-trixie/docs/install_application.md#a-docker-compose-recommended)
+
+Install packages:
+
+```shell
+sudo apt-get install -y ca-certificates curl wget gnupg lsb-release git jq vim
+```
+
+Download and add Docker's official GPG key:
+
+```shell
+mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/debian/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+```
+
+Set up the Docker repository:
+
+```BASH
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+  https://download.docker.com/linux/debian \
+  $(lsb_release -cs) stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+```
+
+Install Docker and Docker Compose:
+
+```shell
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+```
+
 ### **2. Launch the Backend**
 
 Navigate to the project directory and start the Docker container:
