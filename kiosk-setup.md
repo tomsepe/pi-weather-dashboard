@@ -50,7 +50,8 @@ Useful commands:
 - **Status:** `systemctl --user status weather-kiosk.service`
 - **Stop:** `systemctl --user stop weather-kiosk.service`
 - **Start:** `systemctl --user start weather-kiosk.service`
-- **Kiosk log (script + Chromium):** `cat /tmp/weather-kiosk.log`
+- **Kiosk log (script + Chromium):** `cat /tmp/weather-kiosk.log`  
+  The `crashpad/snapshot/elf/elf_dynamic_array_reader.h:64 tag not found` line is a harmless Chromium/Crashpad warning on Pi and can be ignored.
 
 ### If the browser doesn’t relaunch after restart
 
