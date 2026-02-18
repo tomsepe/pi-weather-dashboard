@@ -46,13 +46,22 @@ if [ -z "$CHROMIUM" ]; then
 fi
 echo "Using: $CHROMIUM"
 
+# Dedicated profile dir so the kiosk doesn't hit singleton-lock conflicts when
+# the service is restarted (old process killed, new one starts).
+USER_DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/weather-kiosk-chromium"
+mkdir -p "$USER_DATA_DIR"
+echo "Chromium user-data-dir: $USER_DATA_DIR"
+
 # 3. Launch in kiosk mode (Wayland). Runs in foreground so script waits until
 #    Chromium exits—if you run this manually, the terminal won't return until you close the window.
 #    When the "Default Keyring" prompt appears, set a password once and enable "Unlock on login".
 #    GCM registration errors are filtered from the log (harmless Chromium↔Google chatter).
+#    --disable-crashpad avoids Pi-specific crashpad exit on some builds.
 echo "Launching Chromium..."
 export WAYLAND_DEBUG=0
 "$CHROMIUM" \
+  --user-data-dir="$USER_DATA_DIR" \
+  --disable-crashpad \
   --kiosk \
   --noerrdialogs \
   --disable-infobars \
