@@ -77,6 +77,19 @@ Ensure you have your **Weather Underground API Key** and **Station ID**. Update 
 * STATION_ID: Your Vevor station identifier.  
 * API_KEY: Your personal PWS API key.
 
+```BASH
+nano .env
+```
+Configure your api, weatherstaion id, lat and lon, and your home assistant access info
+
+```
+HA_URL=http:url_of_home_assistant_server:PORT
+HA_ACCESS_TOKEN=your_token
+WU_API_KEY=your_api_key
+WU_STATION_ID=your_station_ID
+LAT_LON="44.05,-123.35"
+```
+
 ---
 ## A) Docker Compose (recommended):
 
@@ -113,13 +126,27 @@ sudo apt-get update
 sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 ```
 
+To run Docker commands without using `sudo` every time, add your user to the `docker` group.
+
+1. **Add your user to the group:**
+```bash
+sudo usermod -aG docker $USER
+```
+
+1. **Activate the changes:** You usually need to log out and log back in for this to take effect. However, you can apply the changes to your current terminal session immediately by running:
+
+```bash
+newgrp docker
+```
+
+
 ### **2. Launch the Backend**
 
 Navigate to the project directory and start the Docker container:
 
 ```bash  
 cd ~/pi-weather-dashboard  
-docker-compose up -d  
+docker compose up -d  
 ```
 
 The dashboard will be available at http://localhost:5000.
