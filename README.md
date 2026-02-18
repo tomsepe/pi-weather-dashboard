@@ -29,6 +29,43 @@ pi-weather-dashboard/
 └── README.md                \# You are here
 ```
 
+---
+## **2. Setup Static IP for Networking:**
+```BASH
+sudo nmcli device wifi list
+sudo nmcli c show
+sudo nmcli dev wifi connect <SSID> password <password>
+```
+
+Get the network device name, i.e  "RR_IoT" "RR_Home"
+
+### For static IP:
+```BASH
+sudo nmcli connection modify "netplan-wlan0-RR_IoT" ipv4.addresses 192.168.30.100/24
+sudo nmcli connection modify "netplan-wlan0-RR_IoT" ipv4.gateway 192.168.30.1
+sudo nmcli connection modify "netplan-wlan0-RR_IoT" ipv4.dns 192.168.30.1
+sudo nmcli connection modify "netplan-wlan0-RR_IoT" ipv4.method manual
+```
+
+### For DHCP:
+```BASH
+sudo nmcli connection modify "netplan-eth0" ipv4.method auto
+```
+
+ipv4.addresses Assigns the static IP you want, with the subnet mask 255.255.255.0/24
+ipv4.gateway Your router’s IP address
+ipv4.dns Points to the DNS server often the same as your gateway
+ipv4.method manual Tells NetworkManager to use a static config instead of DHCP
+
+### Apply the Changes:
+
+nmcli commands modify the config, but they don't always force the network card to "reread" them immediately. You need to restart the connection.
+
+Run this command:
+```bash
+sudo nmcli connection up "RR_IoT"
+```
+
 ## **🚀 Setup & Installation**
 
 ### **1. API Configuration**
