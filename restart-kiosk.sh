@@ -1,18 +1,17 @@
 #!/bin/bash
-# Restart the weather kiosk without rebooting.
-# Run from the Pi: use a terminal on the desktop (Wayland env required for relaunch).
-# If run over SSH, the restarted service may not have Wayland—run from a desktop terminal instead.
+# Start or restart the weather kiosk without rebooting.
+# Run from the Pi: use a terminal on the desktop (Wayland env required).
+# If run over SSH, the service may not have Wayland—run from a desktop terminal instead.
 
-if ! systemctl --user is-active --quiet weather-kiosk.service 2>/dev/null; then
-  echo "weather-kiosk.service not running. Start it with: systemctl --user start weather-kiosk.service"
-  echo "Or run the kiosk script directly: ./kiosk.sh"
-  exit 1
+if systemctl --user is-active --quiet weather-kiosk.service 2>/dev/null; then
+  echo "Restarting kiosk..."
+  systemctl --user restart weather-kiosk.service
+else
+  echo "Starting kiosk..."
+  systemctl --user start weather-kiosk.service
 fi
-
-echo "Stopping kiosk..."
-systemctl --user restart weather-kiosk.service
-echo "Kiosk service restarted. Waiting a few seconds for startup..."
-sleep 4
+echo "Waiting for startup..."
+sleep 6
 
 # Show whether the service is running and recent log output
 echo ""
