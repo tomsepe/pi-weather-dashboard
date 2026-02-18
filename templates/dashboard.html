@@ -4,7 +4,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { background: #000; color: #fff; font-family: sans-serif; margin: 0; overflow: hidden; }
-        .container { display: grid; grid-template-columns: 1.2fr 0.8fr; height: 100vh; width: 100vw; }
+        .container { display: grid; grid-template-columns: 1.2fr 0.8fr; height: calc(100vh - 56px); width: 100vw; }
         
         /* Left Side: Real-time Vevor Data */
         .current { padding: 20px; border-right: 1px solid #333; display: flex; flex-direction: column; justify-content: center; }
@@ -17,10 +17,18 @@
         .forecast-day { border-bottom: 1px solid #222; padding-bottom: 5px; }
         .day-name { font-size: 20px; color: #ff9f0a; }
         .day-temps { font-size: 24px; }
+        .nav { display: flex; gap: 12px; padding: 12px 20px; background: #111; border-top: 1px solid #333; }
+        .nav a { display: inline-block; padding: 14px 28px; background: #333; color: #ff9f0a; text-decoration: none; font-size: 20px; font-weight: bold; border-radius: 8px; }
+        .nav a:hover, .nav a.active { background: #ff9f0a; color: #000; }
     </style>
     <meta http-equiv="refresh" content="300">
 </head>
 <body>
+    <nav class="nav">
+        <a href="/" class="active">Home</a>
+        <a href="/10day">5 Day</a>
+        <a href="/ha">Controls</a>
+    </nav>
     <div class="container">
         <div class="current">
             <div class="label">Mosswood Current</div>

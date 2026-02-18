@@ -30,14 +30,16 @@ chmod +x ~/.config/labwc/autostart
 
 ### 3. Restart without rebooting
 
-From the Pi (terminal on the desktop or SSH as the same user):
+**Use a terminal on the Pi desktop** (not SSH). The restarted service needs the graphical session’s Wayland environment to open the browser again.
 
 ```bash
 cd ~/pi-weather-dashboard
 ./restart-kiosk.sh
 ```
 
-Or directly:
+The script prints service status and the last 20 lines of the kiosk log so you can see why the window did or didn’t appear.
+
+Or restart directly:
 
 ```bash
 systemctl --user restart weather-kiosk.service
@@ -48,7 +50,18 @@ Useful commands:
 - **Status:** `systemctl --user status weather-kiosk.service`
 - **Stop:** `systemctl --user stop weather-kiosk.service`
 - **Start:** `systemctl --user start weather-kiosk.service`
-- **Log (script output):** `cat /tmp/weather-kiosk.log`
+- **Kiosk log (script + Chromium):** `cat /tmp/weather-kiosk.log`  
+  The `crashpad/snapshot/elf/elf_dynamic_array_reader.h:64 tag not found` line is a harmless Chromium/Crashpad warning on Pi and can be ignored.
+
+### If the browser doesn’t relaunch after restart
+
+1. **Run `./restart-kiosk.sh` from a terminal on the desktop** (not SSH). Over SSH, the user systemd session often doesn’t have `WAYLAND_DISPLAY` set, so the restarted kiosk can’t open a window.
+2. **Check the kiosk log:** `cat /tmp/weather-kiosk.log`  
+   - Look for `WAYLAND_DISPLAY=wayland-1` (or similar). If you see `WARNING: WAYLAND_DISPLAY is not set`, the service was started without a Wayland display—run the restart from a desktop terminal.
+   - Look for `Launching Chromium...` and the line after it. If Chromium exits with a non‑zero code immediately, the log may show why (e.g. Wayland connection failed).
+3. **Check service status:** `systemctl --user status weather-kiosk.service`  
+   - If the service is “active (running)”, the script is running but Chromium may be failing to connect to Wayland. Check the log as above.
+   - If the service is “failed”, read the status output and the end of `/tmp/weather-kiosk.log` for the error.
 
 ---
 

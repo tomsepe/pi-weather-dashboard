@@ -10,6 +10,9 @@ Type=simple
 # so this service inherits the real session's display. Otherwise Chromium fails with
 # "Failed to connect to Wayland display".
 WorkingDirectory=%h/pi-weather-dashboard
+# Give the previous Chromium time to fully exit and release singleton lock/socket
+# before starting a new one (fixes "restart: Chromium exits immediately with code 0").
+ExecStartPre=/bin/sleep 5
 ExecStart=%h/pi-weather-dashboard/kiosk.sh
 Restart=on-failure
 RestartSec=5

@@ -6,14 +6,31 @@ LOG=/tmp/weather-kiosk.log
 exec > "$LOG" 2>&1
 echo "=== $(date) kiosk starting ==="
 
+# Debug: Wayland env (required for Chromium under labwc; if unset, window won't appear)
+if [ -n "${WAYLAND_DISPLAY:-}" ]; then
+  echo "WAYLAND_DISPLAY=$WAYLAND_DISPLAY"
+else
+  echo "WARNING: WAYLAND_DISPLAY is not set - Chromium may fail to open a window"
+fi
+if [ -n "${XDG_RUNTIME_DIR:-}" ]; then
+  echo "XDG_RUNTIME_DIR is set"
+else
+  echo "WARNING: XDG_RUNTIME_DIR is not set"
+fi
+
 # 1. Wait for Flask to be reachable (Docker may need a few seconds after boot)
+FLASK_READY=0
 for i in $(seq 1 30); do
   if curl -s -o /dev/null -w "%{http_code}" --connect-timeout 1 http://127.0.0.1:5000/ 2>/dev/null | grep -q '200\|301\|302'; then
     echo "Flask ready after ${i}s"
+    FLASK_READY=1
     break
   fi
   sleep 1
 done
+if [ "$FLASK_READY" -eq 0 ]; then
+  echo "WARNING: Flask not reachable after 30s (continuing anyway)"
+fi
 
 # 2. Find Chromium (name differs: chromium vs chromium-browser)
 CHROMIUM=""
@@ -29,12 +46,22 @@ if [ -z "$CHROMIUM" ]; then
 fi
 echo "Using: $CHROMIUM"
 
+# Dedicated profile dir so the kiosk doesn't hit singleton-lock conflicts when
+# the service is restarted (old process killed, new one starts).
+USER_DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/weather-kiosk-chromium"
+mkdir -p "$USER_DATA_DIR"
+echo "Chromium user-data-dir: $USER_DATA_DIR"
+
 # 3. Launch in kiosk mode (Wayland). Runs in foreground so script waits until
 #    Chromium exits—if you run this manually, the terminal won't return until you close the window.
 #    When the "Default Keyring" prompt appears, set a password once and enable "Unlock on login".
 #    GCM registration errors are filtered from the log (harmless Chromium↔Google chatter).
+#    --disable-crashpad avoids Pi-specific crashpad exit on some builds.
+echo "Launching Chromium..."
 export WAYLAND_DEBUG=0
 "$CHROMIUM" \
+  --user-data-dir="$USER_DATA_DIR" \
+  --disable-crashpad \
   --kiosk \
   --noerrdialogs \
   --disable-infobars \
@@ -45,5 +72,5 @@ export WAYLAND_DEBUG=0
   --window-position=0,0 \
   http://127.0.0.1:5000 \
   2>&1 | grep -v "Registration response error message"
-
-echo "=== $(date) chromium exited (code ${PIPESTATUS[0]}) ==="
+CHROMIUM_EXIT=$?
+echo "=== $(date) Chromium exited with code $CHROMIUM_EXIT ==="

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { background: #000; color: #fff; font-family: sans-serif; margin: 0; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
+        .nav { display: flex; gap: 12px; padding: 12px 20px; background: #111; border-top: 1px solid #333; }
+        .nav a { display: inline-block; padding: 14px 28px; background: #333; color: #ff9f0a; text-decoration: none; font-size: 20px; font-weight: bold; border-radius: 8px; }
+        .nav a:hover, .nav a.active { background: #ff9f0a; color: #000; }
+        .content { flex: 1; overflow-y: auto; padding: 16px; }
+        .ha-unconfigured { color: #888; font-size: 18px; padding: 20px; }
+        .controls-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+        .control-card { background: #111; border: 1px solid #333; border-radius: 6px; padding: 13px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .control-card .name { color: #ff9f0a; font-weight: bold; font-size: 12.8px; text-align: center; word-break: break-word; }
+        .control-card .state { color: #888; font-size: 11px; }
+        .control-card .buttons { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+        .control-card button { padding: 8px 14px; border: none; border-radius: 6px; font-size: 12.8px; font-weight: bold; cursor: pointer; background: #333; color: #ff9f0a; }
+        .control-card button:hover { background: #ff9f0a; color: #000; }
+        .control-card button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .control-card button.active { background: #ff9f0a; color: #000; }
+        .control-card button.active2 { background: #ff0000; color: #000; }
+        .control-card .brightness { width: 100%; margin-top: 3px; }
+        .control-card .brightness label { display: block; font-size: 9.6px; color: #888; margin-bottom: 3px; }
+        .control-card input[type="range"] { width: 100%; height: 6px; -webkit-appearance: none; appearance: none; background: #333; border-radius: 3px; outline: none; }
+        .control-card input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #ff9f0a; cursor: pointer; }
+        .control-card input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #ff9f0a; cursor: pointer; border: none; }
+        .error-msg { color: #c00; padding: 10px 0; }
+        .loading { color: #888; padding: 20px; }
+    </style>
+    <meta http-equiv="refresh" content="300">
+</head>
+<body>
+    <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/10day">5 Day</a>
+        <a href="/ha" class="active">Controls</a>
+    </nav>
+    <div class="content">
+        {% if not ha_configured %}
+        <div class="ha-unconfigured">Home Assistant not configured. Set HA_URL and HA_ACCESS_TOKEN in the environment.</div>
+        {% else %}
+        <div id="controls-root">
+            <div class="loading" id="loading">Loading…</div>
+            <div class="error-msg" id="error" style="display: none;"></div>
+            <div class="controls-grid" id="controls" style="display: none;"></div>
+        </div>
+        {% endif %}
+    </div>
+    <script>
+(function() {
+    if (!document.getElementById('controls')) return;
+    var POLL_SEC = 15;
+    var DOMAINS = ['light', 'switch', 'fan'];
+    var EXCLUDED = ['Security Camera', 'pi-tinyhouse', 'pi-respeaker', 'assist'];
+
+    function isExcluded(state) {
+        var name = (state.attributes && state.attributes.friendly_name) || '';
+        var id = (state.entity_id || '').toLowerCase();
+        var nameLower = name.toLowerCase();
+        return EXCLUDED.some(function(x) {
+            var xl = x.toLowerCase();
+            return nameLower.indexOf(xl) !== -1 || id.indexOf(xl) !== -1;
+        });
+    }
+
+    function showError(msg) {
+        var el = document.getElementById('error');
+        el.textContent = msg;
+        el.style.display = msg ? 'block' : 'none';
+    }
+
+    function renderStates(states) {
+        var container = document.getElementById('controls');
+        var loading = document.getElementById('loading');
+        states = (states || []).filter(function(s) { return !isExcluded(s); });
+        if (states.length === 0) {
+            loading.textContent = 'No lights or fans found.';
+            container.style.display = 'none';
+            return;
+        }
+        loading.style.display = 'none';
+        container.style.display = 'grid';
+        container.innerHTML = '';
+        states.forEach(function(s) {
+            var entityId = s.entity_id || '';
+            var domain = entityId.split('.')[0];
+            var name = (s.attributes && s.attributes.friendly_name) || entityId;
+            var isOn = (s.state || '').toLowerCase() === 'on';
+            var brightness = (s.attributes && s.attributes.brightness != null) ? s.attributes.brightness : 255;
+            var brightnessPct = Math.round((brightness / 255) * 100);
+            if (!isOn) brightnessPct = 0;
+            var card = document.createElement('div');
+            card.className = 'control-card';
+            card.setAttribute('data-entity-id', entityId);
+            var sliderHtml = (domain === 'light') ?
+                '<div class="brightness">' +
+                '<label>Brightness ' + brightnessPct + '%</label>' +
+                '<input type="range" min="0" max="100" value="' + brightnessPct + '" data-entity-id="' + escapeHtml(entityId) + '">' +
+                '</div>' : '';
+            card.innerHTML =
+                '<span class="name">' + escapeHtml(name) + '</span>' +
+                '<div class="buttons">' +
+                '<button type="button" data-action="turn_on" ' + (isOn ? 'class="active"' : '') + '>On</button>' +
+                '<button type="button" data-action="turn_off" ' + (!isOn ? 'class="active2"' : '') + '>Off</button>' +
+                '</div>' +
+                sliderHtml;
+            container.appendChild(card);
+        });
+        container.querySelectorAll('button').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var card = this.closest('.control-card');
+                var entityId = card.getAttribute('data-entity-id');
+                var domain = entityId.split('.')[0];
+                var action = this.getAttribute('data-action');
+                callService(domain, action, { entity_id: entityId });
+            });
+        });
+        var sliderTimeout = {};
+        container.querySelectorAll('input[type="range"]').forEach(function(slider) {
+            var entityId = slider.getAttribute('data-entity-id');
+            var label = slider.previousElementSibling;
+            function sendBrightness() {
+                var pct = parseInt(slider.value, 10);
+                if (pct === 0) {
+                    callService('light', 'turn_off', { entity_id: entityId });
+                } else {
+                    callService('light', 'turn_on', { entity_id: entityId, brightness_pct: pct });
+                }
+            }
+            slider.addEventListener('input', function() {
+                if (label) label.textContent = 'Brightness ' + slider.value + '%';
+                var id = entityId;
+                clearTimeout(sliderTimeout[id]);
+                sliderTimeout[id] = setTimeout(sendBrightness, 200);
+            });
+        });
+    }
+
+    function escapeHtml(s) {
+        var div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+    }
+
+    function callService(domain, service, data) {
+        showError('');
+        fetch('/api/ha/service', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ domain: domain, service: service, data: data })
+        }).then(function(r) {
+            if (!r.ok) return r.json().then(function(j) { throw new Error(j.error || r.statusText); });
+            return r.json();
+        }).then(function() {
+            fetchStates();
+        }).catch(function(e) {
+            showError('Failed: ' + e.message);
+        });
+    }
+
+    function fetchStates() {
+        var q = '?domain=' + DOMAINS.join(',');
+        fetch('/api/ha/states' + q)
+            .then(function(r) {
+                if (!r.ok) return r.json().then(function(j) { throw new Error(j.error || r.statusText); });
+                return r.json();
+            })
+            .then(function(states) {
+                showError('');
+                renderStates(states);
+            })
+            .catch(function(e) {
+                showError('Could not load states: ' + e.message);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('controls').style.display = 'none';
+            });
+    }
+
+    fetchStates();
+    setInterval(fetchStates, POLL_SEC * 1000);
+})();
+    </script>
+</body>
+</html>
