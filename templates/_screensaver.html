@@ -1,0 +1,161 @@
+{# In-browser screensaver: configurable idle timeout and type (black / rainbow_ball / weather_quote). Tap/move to dismiss. #}
+{% set _ss_enabled = screensaver_enabled is defined and screensaver_enabled %}
+{% set _ss_timeout = screensaver_timeout_sec | default(180) %}
+{% set _ss_type = screensaver_type | default('rainbow_ball') %}
+{% if _ss_enabled %}
+<script>window.SCREENSAVER_CONFIG = { enabled: true, timeoutSec: {{ _ss_timeout }}, type: "{{ _ss_type }}" };</script>
+<div id="screensaver-overlay" class="screensaver-overlay" aria-hidden="true" hidden data-type="{{ _ss_type }}">
+    <div id="screensaver-ball" class="screensaver-ball"></div>
+    <div id="screensaver-quote" class="screensaver-quote {% if _ss_type == 'weather_quote' %}screensaver-quote-large{% endif %}">
+        {% if quote_text is defined and quote_text and _ss_type == 'weather_quote' %}
+        <p class="screensaver-quote-text">"{{ quote_text }}"</p>
+        {% if quote_author %}<p class="screensaver-quote-author">— {{ quote_author }}</p>{% endif %}
+        {% endif %}
+    </div>
+</div>
+<style>
+    .screensaver-overlay {
+        position: fixed;
+        inset: 0;
+        background: #000;
+        z-index: 99999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: none;
+    }
+    .screensaver-overlay[hidden] { display: none !important; }
+    .screensaver-overlay[data-type="black"] #screensaver-ball,
+    .screensaver-overlay[data-type="black"] #screensaver-quote { display: none !important; }
+    .screensaver-overlay[data-type="weather_quote"] #screensaver-ball { display: none !important; }
+    .screensaver-overlay[data-type="rainbow_ball"] #screensaver-quote { display: none !important; }
+    .screensaver-ball {
+        position: absolute;
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        background: conic-gradient(from 0deg, #e11, #fa0, #8a0, #0aa, #08f, #80f, #e11);
+        box-shadow: inset -8px -8px 20px rgba(0,0,0,0.3), inset 8px 8px 20px rgba(255,255,255,0.2);
+        will-change: transform;
+    }
+    .screensaver-quote {
+        position: absolute;
+        bottom: 28px;
+        left: 20px;
+        right: 20px;
+        text-align: center;
+        pointer-events: none;
+    }
+    .screensaver-quote-text {
+        color: #666;
+        font-size: 15px;
+        font-style: italic;
+        margin: 0;
+        line-height: 1.4;
+    }
+    .screensaver-quote-author {
+        color: #444;
+        font-size: 13px;
+        margin-top: 6px;
+    }
+    .screensaver-quote-large .screensaver-quote-text {
+        color: #888;
+        font-size: 24px;
+        line-height: 1.45;
+    }
+    .screensaver-quote-large .screensaver-quote-author {
+        color: #666;
+        font-size: 18px;
+        margin-top: 10px;
+    }
+</style>
+<script>
+(function() {
+    var cfg = window.SCREENSAVER_CONFIG || { enabled: true, timeoutSec: 180, type: 'rainbow_ball' };
+    if (!cfg.enabled) return;
+    var IDLE_MS = Math.max(10000, (cfg.timeoutSec || 180) * 1000);
+    var overlay = document.getElementById('screensaver-overlay');
+    var ball = document.getElementById('screensaver-ball');
+    var timer = null;
+    var animId = null;
+    var x = 100, y = 100, vx = 0.35, vy = 0.28;
+    var radius = 50;
+    var w = 800, h = 480;
+
+    function getSize() {
+        w = window.innerWidth;
+        h = window.innerHeight;
+    }
+
+    function resetIdle() {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(showScreensaver, IDLE_MS);
+    }
+
+    function showScreensaver() {
+        if (!overlay) return;
+        overlay.removeAttribute('hidden');
+        overlay.setAttribute('aria-hidden', 'false');
+        overlay.setAttribute('data-type', cfg.type || 'rainbow_ball');
+        getSize();
+        x = radius + Math.random() * (w - 2 * radius);
+        y = radius + Math.random() * (h - 2 * radius);
+        if (animId) cancelAnimationFrame(animId);
+        if (cfg.type === 'rainbow_ball') animId = requestAnimationFrame(bounce);
+    }
+
+    function hideScreensaver() {
+        if (!overlay) return;
+        overlay.setAttribute('hidden', '');
+        overlay.setAttribute('aria-hidden', 'true');
+        if (animId) { cancelAnimationFrame(animId); animId = null; }
+        resetIdle();
+    }
+
+    function bounce() {
+        x += vx;
+        y += vy;
+        if (x <= radius) { x = radius; vx = -vx; }
+        if (x >= w - radius) { x = w - radius; vx = -vx; }
+        if (y <= radius) { y = radius; vy = -vy; }
+        if (y >= h - radius) { y = h - radius; vy = -vy; }
+        if (ball) {
+            ball.style.left = (x - radius) + 'px';
+            ball.style.top = (y - radius) + 'px';
+        }
+        animId = requestAnimationFrame(bounce);
+    }
+
+    function onActivity() {
+        if (!overlay || overlay.hasAttribute('hidden')) { resetIdle(); return; }
+        hideScreensaver();
+    }
+
+    ['mousedown','mousemove','keydown','touchstart','click'].forEach(function(ev) {
+        document.addEventListener(ev, onActivity, { passive: true });
+    });
+
+    var quoteEl = document.getElementById('screensaver-quote');
+    if (cfg.type === 'weather_quote' && quoteEl) {
+        var QUOTE_REFRESH_MS = 5 * 60 * 1000;
+        function refreshQuote() {
+            fetch('/api/random-quote').then(function(r) { return r.json(); }).then(function(data) {
+                if (data.quote_text && quoteEl) {
+                    quoteEl.innerHTML = '<p class="screensaver-quote-text">"' + escapeHtml(data.quote_text) + '"</p>' +
+                        (data.quote_author ? '<p class="screensaver-quote-author">— ' + escapeHtml(data.quote_author) + '</p>' : '');
+                }
+            }).catch(function() {});
+        }
+        function escapeHtml(s) {
+            var div = document.createElement('div');
+            div.textContent = s;
+            return div.innerHTML;
+        }
+        setInterval(refreshQuote, QUOTE_REFRESH_MS);
+    }
+
+    getSize();
+    resetIdle();
+})();
+</script>
+{% endif %}

@@ -1,3 +1,4 @@
+import json
 import os
 import random
 import re
@@ -15,6 +16,101 @@ log = logging.getLogger(__name__)
 STATION_ID = os.environ.get("WU_STATION_ID")
 API_KEY = os.environ.get("WU_API_KEY")
 LAT_LON = os.environ.get("LAT_LON")
+
+# Settings file (UI-editable; overrides/env fallbacks applied in _load_settings)
+SETTINGS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config")
+SETTINGS_FILE = os.path.join(SETTINGS_DIR, "settings.json")
+
+DEFAULT_SETTINGS = {
+    "location_name": "Veneta",
+    "latitude": None,
+    "longitude": None,
+    "vevor_enabled": True,
+    "screensaver_enabled": True,
+    "screensaver_timeout_sec": 180,
+    "screensaver_type": "rainbow_ball",
+}
+SCREENSAVER_TYPES = ("black", "rainbow_ball", "weather_quote")
+
+
+def _parse_lat_lon_from_env() -> tuple[float | None, float | None]:
+    """Parse LAT_LON env (e.g. '44.05,-123.35') into (lat, lon) or (None, None)."""
+    raw = (os.environ.get("LAT_LON") or "").strip().strip('"')
+    if not raw:
+        return None, None
+    parts = [p.strip() for p in raw.split(",") if p.strip()]
+    if len(parts) != 2:
+        return None, None
+    try:
+        return float(parts[0]), float(parts[1])
+    except ValueError:
+        return None, None
+
+
+def _load_settings() -> dict:
+    """Load settings from config/settings.json with env/default fallbacks."""
+    out = dict(DEFAULT_SETTINGS)
+    env_lat, env_lon = _parse_lat_lon_from_env()
+    if env_lat is not None and env_lon is not None:
+        out["latitude"] = env_lat
+        out["longitude"] = env_lon
+    if not os.path.isfile(SETTINGS_FILE):
+        return out
+    try:
+        with open(SETTINGS_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        log.warning("Could not load settings file: %s", e)
+        return out
+    for key in DEFAULT_SETTINGS:
+        if key in data and data[key] is not None:
+            out[key] = data[key]
+    if out["latitude"] is None and env_lat is not None:
+        out["latitude"] = env_lat
+    if out["longitude"] is None and env_lon is not None:
+        out["longitude"] = env_lon
+    return out
+
+
+def _get_lat_lon_str() -> str:
+    """Return geocode string for APIs (latitude,longitude). Uses settings then env."""
+    s = _load_settings()
+    lat, lon = s.get("latitude"), s.get("longitude")
+    if lat is not None and lon is not None:
+        return f"{lat},{lon}"
+    return LAT_LON or ""
+
+
+def _save_settings(data: dict) -> None:
+    """Validate and write settings to config/settings.json."""
+    allowed = set(DEFAULT_SETTINGS.keys())
+    payload = {k: v for k, v in data.items() if k in allowed}
+    for key, default in DEFAULT_SETTINGS.items():
+        if key not in payload and default is not None:
+            payload[key] = default
+    lat = payload.get("latitude")
+    lon = payload.get("longitude")
+    if lat is not None:
+        try:
+            payload["latitude"] = float(lat)
+        except (TypeError, ValueError):
+            payload["latitude"] = None
+    if lon is not None:
+        try:
+            payload["longitude"] = float(lon)
+        except (TypeError, ValueError):
+            payload["longitude"] = None
+    timeout = payload.get("screensaver_timeout_sec", 180)
+    try:
+        payload["screensaver_timeout_sec"] = max(10, int(timeout))
+    except (TypeError, ValueError):
+        payload["screensaver_timeout_sec"] = 180
+    stype = (payload.get("screensaver_type") or "").strip()
+    if stype not in SCREENSAVER_TYPES:
+        payload["screensaver_type"] = "rainbow_ball"
+    os.makedirs(SETTINGS_DIR, exist_ok=True)
+    with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
 
 # Home Assistant: long-lived token at http://HA_URL/profile; token stays server-side.
 HA_URL = (os.environ.get("HA_URL") or "").rstrip("/")
@@ -56,7 +152,7 @@ def _load_weather_quote() -> tuple[str, str] | None:
 @app.after_request
 def _disable_cache_for_dashboard(response):
     """Prevent browsers from caching dashboard HTML so updates show after deploy."""
-    if request.path in ("/", "/5day", "/ha") and response.content_type and "text/html" in response.content_type:
+    if request.path in ("/", "/5day", "/ha", "/settings") and response.content_type and "text/html" in response.content_type:
         response.cache_control.no_store = True
         response.cache_control.no_cache = True
         response.cache_control.must_revalidate = True
@@ -136,9 +232,12 @@ def _fetch_forecast(days: int):
     """Fetch daily forecast (5 or 10 day). Returns (forecast_dict, None) or (None, error_response)."""
     if days not in (5, 10):
         return None, _error_page("Bad request", "Invalid forecast days.", 400)
+    geocode = _get_lat_lon_str()
+    if not geocode or not API_KEY:
+        return None, _error_page("Configuration", "Set LAT_LON (or latitude/longitude in Settings) and WU_API_KEY.", 503)
     forecast_url = (
         f"https://api.weather.com/v3/wx/forecast/daily/{days}day?"
-        f"geocode={LAT_LON}&format=json&units=e&language=en-US&apiKey={API_KEY}"
+        f"geocode={geocode}&format=json&units=e&language=en-US&apiKey={API_KEY}"
     )
     log.info("Fetching %d-day forecast", days)
     resp = requests.get(forecast_url, timeout=10)
@@ -223,74 +322,115 @@ def _forecast_icon_slugs(forecast: dict) -> list[str]:
     return slugs
 
 
+def _fetch_current_by_geocode() -> dict | None:
+    """Fetch current conditions by lat/lon (Weather.com v3). Returns PWS-shaped dict or None."""
+    geocode = _get_lat_lon_str()
+    if not geocode or not API_KEY:
+        return None
+    url = (
+        f"https://api.weather.com/v3/wx/observations/current?"
+        f"geocode={geocode}&units=e&language=en-US&format=json&apiKey={API_KEY}"
+    )
+    try:
+        r = requests.get(url, timeout=10)
+        if r.status_code != 200:
+            log.warning("Current-by-geocode API returned %s", r.status_code)
+            return None
+        data = r.json()
+    except Exception as e:
+        log.warning("Current-by-geocode request failed: %s", e)
+        return None
+    # v3 returns temperature, windSpeed, relativeHumidity, uvIndex (flat)
+    temp = data.get("temperature")
+    wind = data.get("windSpeed")
+    humidity = data.get("relativeHumidity")
+    uv = data.get("uvIndex")
+    if temp is None:
+        return None
+    # Normalize to PWS-like shape for dashboard template
+    return {
+        "imperial": {
+            "temp": temp if isinstance(temp, (int, float)) else None,
+            "windSpeed": wind if isinstance(wind, (int, float)) else 0,
+        },
+        "humidity": humidity if isinstance(humidity, (int, float)) else None,
+        "uv": uv if uv is not None else 0,
+    }
+
+
+def _template_settings() -> dict:
+    """Settings dict to pass into every dashboard/settings template."""
+    s = _load_settings()
+    return {
+        "location_name": s.get("location_name") or "",
+        "screensaver_enabled": bool(s.get("screensaver_enabled", True)),
+        "screensaver_timeout_sec": max(10, int(s.get("screensaver_timeout_sec") or 180)),
+        "screensaver_type": s.get("screensaver_type") in SCREENSAVER_TYPES and s["screensaver_type"] or "rainbow_ball",
+    }
+
+
+def _fallback_current() -> dict:
+    """Placeholder current when no PWS and no geocode current available."""
+    return {
+        "imperial": {"temp": None, "windSpeed": None},
+        "humidity": None,
+        "uv": None,
+    }
+
+
 @app.route("/")
 def index():
     try:
-        # 1. Current conditions from your PWS (Vevor station)
-        pws_url = (
-            f"https://api.weather.com/v2/pws/observations/current?"
-            f"stationId={STATION_ID}&format=json&units=e&apiKey={API_KEY}"
-        )
-        log.info("Fetching PWS current conditions (key=%s)", _mask_key(API_KEY))
-        pws_resp = requests.get(pws_url, timeout=10)
+        settings = _load_settings()
+        vevor_enabled = bool(settings.get("vevor_enabled", True))
+        current = None
 
-        if pws_resp.status_code != 200:
-            log.error(
-                "PWS API returned status %s: %s",
-                pws_resp.status_code,
-                pws_resp.text[:500],
+        if vevor_enabled and STATION_ID and API_KEY:
+            # Current conditions from PWS (Vevor station)
+            pws_url = (
+                f"https://api.weather.com/v2/pws/observations/current?"
+                f"stationId={STATION_ID}&format=json&units=e&apiKey={API_KEY}"
             )
-            return _error_page(
-                "PWS API error",
-                f"Server returned {pws_resp.status_code}. Check docker logs for response body.",
-                pws_resp.status_code,
-            )
+            log.info("Fetching PWS current conditions (key=%s)", _mask_key(API_KEY))
+            pws_resp = requests.get(pws_url, timeout=10)
 
-        try:
-            pws_data = pws_resp.json()
-        except Exception as e:
-            log.error("PWS response is not JSON: %s", e)
-            return _error_page(
-                "Invalid API response",
-                "Response was not valid JSON. Check docker logs.",
-                502,
-            )
+            if pws_resp.status_code == 200:
+                try:
+                    pws_data = pws_resp.json()
+                    obs_list = pws_data.get("observations") or []
+                    if obs_list:
+                        current = obs_list[0]
+                except Exception as e:
+                    log.warning("PWS response parse failed: %s", e)
+            if current is None:
+                log.error(
+                    "PWS API returned status %s: %s",
+                    pws_resp.status_code,
+                    (pws_resp.text[:500] if getattr(pws_resp, "text", None) else ""),
+                )
+                return _error_page(
+                    "PWS API error",
+                    f"Server returned {pws_resp.status_code}. Check docker logs or disable Vevor in Settings.",
+                    pws_resp.status_code,
+                )
 
-        if "observations" not in pws_data:
-            # API often returns {"errors": [{"message": "..."}]} or similar when key/station invalid
-            errors = pws_data.get("errors", pws_data.get("error", pws_data))
-            log.error(
-                "PWS response missing 'observations'. Keys: %s. Body snippet: %s",
-                list(pws_data.keys()),
-                str(errors)[:400],
-            )
-            return _error_page(
-                "No observations in API response",
-                "The weather API did not return station data. Often caused by invalid API key or "
-                "station ID, or the PWS API may have changed. Check docker logs for the exact response.",
-                502,
-            )
+        if current is None:
+            current = _fetch_current_by_geocode()
+        if current is None:
+            current = _fallback_current()
 
-        obs_list = pws_data["observations"]
-        if not obs_list:
-            log.warning("PWS returned observations list empty")
-            return _error_page(
-                "No current observation",
-                "Station returned no current observation (list empty). Check station ID and that the station is reporting.",
-                502,
-            )
-
-        current = obs_list[0]
-
-        # 2. Local forecast (5 day)
+        # Local forecast (5 day)
         forecast, err = _fetch_forecast(5)
         if err is not None:
             return err
 
-        # 3. Inside temp/humidity from Home Assistant (Shelly or other)
+        # Inside temp/humidity from Home Assistant (Shelly or other)
         inside_temp, inside_humidity = _fetch_inside_sensors()
         inside_configured = bool(HA_INSIDE_TEMP_ENTITY or HA_INSIDE_HUMIDITY_ENTITY)
 
+        quote = _load_weather_quote()
+        quote_text, quote_author = quote if quote else (None, None)
+        ctx = _template_settings()
         return render_template(
             "dashboard.html",
             current=current,
@@ -298,6 +438,10 @@ def index():
             inside_temp=inside_temp,
             inside_humidity=inside_humidity,
             inside_configured=inside_configured,
+            show_outside=vevor_enabled,
+            quote_text=quote_text,
+            quote_author=quote_author,
+            **ctx,
         )
 
     except requests.RequestException as e:
@@ -331,6 +475,7 @@ def forecast_5day():
         forecast_icons = _forecast_icon_slugs(forecast)
         quote = _load_weather_quote()
         quote_text, quote_author = quote if quote else (None, None)
+        ctx = _template_settings()
         return render_template(
             "dashboard_5day.html",
             forecast=forecast,
@@ -338,6 +483,7 @@ def forecast_5day():
             forecast_icons=forecast_icons,
             quote_text=quote_text,
             quote_author=quote_author,
+            **ctx,
         )
     except Exception as e:
         log.exception("Unexpected error in 5-day forecast")
@@ -389,6 +535,16 @@ def debug_inside_sensor():
     if HA_INSIDE_HUMIDITY_ENTITY:
         payload["humidity"] = _fetch_ha_state_debug(HA_INSIDE_HUMIDITY_ENTITY)
     return jsonify(payload)
+
+
+@app.route("/api/random-quote")
+def api_random_quote():
+    """Return a random weather quote for the screensaver (refreshes every 5 min client-side)."""
+    quote = _load_weather_quote()
+    if not quote:
+        return jsonify({"quote_text": None, "quote_author": None})
+    quote_text, quote_author = quote
+    return jsonify({"quote_text": quote_text, "quote_author": quote_author})
 
 
 # --- Home Assistant proxy (token never sent to browser) ---
@@ -458,10 +614,44 @@ def ha_service():
 @app.route("/ha")
 def ha_dashboard():
     """Third page: Home Assistant controls. Token not in template."""
+    quote = _load_weather_quote()
+    quote_text, quote_author = quote if quote else (None, None)
+    ctx = _template_settings()
     return render_template(
         "dashboard_ha.html",
         ha_configured=_ha_configured(),
+        quote_text=quote_text,
+        quote_author=quote_author,
+        **ctx,
     )
+
+
+@app.route("/settings")
+def settings_page():
+    """Settings page: location, lat/lon, Vevor, screensaver options."""
+    s = _load_settings()
+    return render_template(
+        "settings.html",
+        location_name=s.get("location_name") or "",
+        latitude=s.get("latitude"),
+        longitude=s.get("longitude"),
+        vevor_enabled=bool(s.get("vevor_enabled", True)),
+        screensaver_enabled=bool(s.get("screensaver_enabled", True)),
+        screensaver_timeout_sec=max(10, int(s.get("screensaver_timeout_sec") or 180)),
+        screensaver_type=s.get("screensaver_type") in SCREENSAVER_TYPES and s["screensaver_type"] or "rainbow_ball",
+    )
+
+
+@app.route("/api/settings", methods=["POST"])
+def api_save_settings():
+    """Save settings from JSON body; return 200 or 4xx with error."""
+    data = request.get_json(silent=True) or {}
+    try:
+        _save_settings(data)
+        return jsonify({"ok": True}), 200
+    except (ValueError, OSError) as e:
+        log.warning("Save settings failed: %s", e)
+        return jsonify({"error": str(e)}), 400
 
 
 def _error_page(title: str, detail: str, status: int = 500) -> tuple:

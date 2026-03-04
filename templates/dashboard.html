@@ -6,10 +6,13 @@
         body { background: #000; color: #fff; font-family: sans-serif; margin: 0; overflow: hidden; }
         .container { display: grid; grid-template-columns: 9fr 11fr; height: calc(100vh - 56px); width: 100vw; }
         
-        /* Left side: two rows – Outside (top) | Inside (bottom) */
-        .sensors { display: grid; grid-template-rows: 1fr 1fr; border-right: 1px solid #333; }
+        /* Left side: Inside (top, compact) | Outside (bottom, more space for extra stats) */
+        .sensors { display: grid; grid-template-rows: min-content 1fr; border-right: 1px solid #333; }
+        .sensors.sensors--inside-only { grid-template-rows: 1fr; }
         .current, .inside { padding: 14px 20px; display: flex; flex-direction: column; justify-content: center; border-bottom: 1px solid #222; }
-        .inside { border-bottom: none; }
+        .sensors .inside { border-bottom: 1px solid #222; }
+        .sensors.sensors--inside-only .inside { border-bottom: none; }
+        .sensors:not(.sensors--inside-only) .current { border-bottom: none; }
         .current .temp-main { font-size: 56px; font-weight: bold; margin: 0; color: #ff9f0a; }
         .current .label, .inside .label { font-size: 18px; color: #888; text-transform: uppercase; }
         .current .stat { font-size: 22px; margin-bottom: 8px; }
@@ -23,27 +26,28 @@
         .day-name { font-size: 20px; color: #ff9f0a; }
         .day-temps { font-size: 24px; }
         .day-narrative { color: #aaa; font-size: 16px; line-height: 1.35; white-space: normal; margin-top: 4px; }
-        .nav { display: flex; gap: 12px; padding: 12px 20px; background: #111; border-top: 1px solid #333; }
+        .nav { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 20px; background: #111; border-top: 1px solid #333; }
+        .nav-left { display: flex; gap: 12px; }
         .nav a { display: inline-block; padding: 14px 28px; background: #333; color: #ff9f0a; text-decoration: none; font-size: 20px; font-weight: bold; border-radius: 8px; }
         .nav a:hover, .nav a.active { background: #ff9f0a; color: #000; }
+        .nav .nav-settings { margin-left: auto; padding: 14px; }
+        .nav .nav-settings svg { width: 28px; height: 28px; vertical-align: middle; }
     </style>
     <meta http-equiv="refresh" content="300">
 </head>
 <body>
     <nav class="nav">
-        <a href="/" class="active">Home</a>
-        <a href="/5day">5 Day</a>
-        <a href="/ha">Controls</a>
+        <div class="nav-left">
+            <a href="/" class="active">Home</a>
+            <a href="/5day">5 Day</a>
+            <a href="/ha">Controls</a>
+        </div>
+        <a href="/settings" class="nav-settings" title="Settings" aria-label="Settings">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+        </a>
     </nav>
     <div class="container">
-        <div class="sensors">
-            <div class="current">
-                <div class="label">Outside</div>
-                <div class="temp-main">{{ current.imperial.temp }}°</div>
-                <div class="stat">💨 Wind: {{ current.imperial.windSpeed }} mph</div>
-                <div class="stat">💧 Humidity: {{ current.humidity }}%</div>
-                <div class="stat">☀️ UV: {{ current.uv }}</div>
-            </div>
+        <div class="sensors{% if not show_outside %} sensors--inside-only{% endif %}">
             <div class="inside">
                 <div class="label">Inside</div>
                 {% if inside_configured %}
@@ -53,9 +57,18 @@
                 <div class="unavailable">Set HA_INSIDE_TEMP_ENTITY (and HA_INSIDE_HUMIDITY_ENTITY) in .env</div>
                 {% endif %}
             </div>
+            {% if show_outside %}
+            <div class="current">
+                <div class="label">Outside</div>
+                <div class="temp-main">{{ current.imperial.temp if current.imperial.temp is not none else '—' }}{% if current.imperial.temp is not none %}°{% endif %}</div>
+                <div class="stat">💨 Wind: {{ current.imperial.windSpeed if current.imperial.windSpeed is not none else '—' }}{% if current.imperial.windSpeed is not none %} mph{% endif %}</div>
+                <div class="stat">💧 Humidity: {{ current.humidity if current.humidity is not none else '—' }}{% if current.humidity is not none %}%{% endif %}</div>
+                <div class="stat">☀️ UV: {{ current.uv if current.uv is not none else '—' }}</div>
+            </div>
+            {% endif %}
         </div>
         <div class="forecast">
-            <div class="label">Veneta Forecast</div>
+            <div class="label">{{ location_name or 'Forecast' }} Forecast</div>
             {% for i in range(1, 4) %}
             <div class="forecast-day">
                 <div class="day-name">{{ forecast.dayOfWeek[i] }}</div>
@@ -65,5 +78,6 @@
             {% endfor %}
         </div>
     </div>
+    {% include '_screensaver.html' %}
 </body>
 </html>
