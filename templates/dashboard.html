@@ -19,9 +19,10 @@
 
         /* Right Side: Forecast */
         .forecast { padding: 20px; display: flex; flex-direction: column; justify-content: space-around; background: #111; }
-        .forecast-day { border-bottom: 1px solid #222; padding-bottom: 5px; }
+        .forecast-day { border-bottom: 1px solid #222; padding-bottom: 10px; margin-bottom: 4px; }
         .day-name { font-size: 20px; color: #ff9f0a; }
         .day-temps { font-size: 24px; }
+        .day-narrative { color: #aaa; font-size: 16px; line-height: 1.35; white-space: normal; margin-top: 4px; }
         .nav { display: flex; gap: 12px; padding: 12px 20px; background: #111; border-top: 1px solid #333; }
         .nav a { display: inline-block; padding: 14px 28px; background: #333; color: #ff9f0a; text-decoration: none; font-size: 20px; font-weight: bold; border-radius: 8px; }
         .nav a:hover, .nav a.active { background: #ff9f0a; color: #000; }
@@ -59,7 +60,7 @@
             <div class="forecast-day">
                 <div class="day-name">{{ forecast.dayOfWeek[i] }}</div>
                 <div class="day-temps">H: {{ forecast.calendarDayTemperatureMax[i] }}° L: {{ forecast.calendarDayTemperatureMin[i] }}°</div>
-                <div style="color:#aaa">{% if forecast.narrative[i] %}{{ forecast.narrative[i][:40] }}{% if forecast.narrative[i]|length > 40 %}...{% endif %}{% endif %}</div>
+                <div class="day-narrative">{% if forecast.narrative[i] %}{{ forecast.narrative[i][:120] }}{% if forecast.narrative[i]|length > 120 %}...{% endif %}{% endif %}</div>
             </div>
             {% endfor %}
         </div>
