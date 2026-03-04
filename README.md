@@ -3,10 +3,10 @@
 **README.md**
 
 # Tiny House Weather Dashboard  
-A standalone, kiosk-mode weather station dashboard for the Raspberry Pi 4 & 7" Touchscreen. This project pulls real-time data from a ****Vevor 7-in-1 Station**** via the Weather Underground API and displays it alongside a localized forecast for ****Veneta, OR****.
+A standalone, kiosk-mode weather dashboard for the Raspberry Pi 4 & 7" Touchscreen. Choose your location (city name, latitude/longitude) in the in-app **Settings** page. Optionally use a **Vevor 7-in-1** (or other) personal weather station for live “Outside” conditions via the Weather Underground API; otherwise the app uses location-based current conditions and forecast from the same API.
 
 ## 🛠 Tech Stack  
-* ****Hardware:**** Raspberry Pi 4, 7" DSI Touchscreen, Vevor PWS.  
+* ****Hardware:**** Raspberry Pi 4, 7" DSI Touchscreen; optional Vevor or other PWS.  
 * ****OS:**** Raspberry Pi OS (Debian 13 "Trixie") using ****Wayland/labwc****.  
 * ****Backend:**** Python 3.11 (Flask) running in ****Docker****.  
 * ****Frontend:**** HTML5 / CSS Grid (Optimized for 800x480 resolution).
@@ -72,15 +72,16 @@ sudo nmcli connection up "RR_IoT"
 
 ### **1. API Configuration**
 
-Ensure you have your **Weather Underground API Key** and **Station ID**. Update the variables in app.py:
+You need a **Weather Underground / Weather.com API key** for forecast and (optionally) PWS current conditions. Set your **location** (city name, latitude, longitude), **Vevor/PWS on or off**, and other options in the app’s **Settings** page (gear icon in the nav); they are saved to `config/settings.json` and apply without restarting. For initial defaults or Docker, use `.env`:
 
-* STATION_ID: Your Vevor station identifier.  
-* API_KEY: Your personal PWS API key.
+* API_KEY: Your Weather.com / Wunderground API key (required for forecast).  
+* WU_STATION_ID: Your PWS station ID (only if you use a personal weather station).  
+* LAT_LON: Default latitude,longitude (e.g. `"44.05,-123.35"`) if not set in Settings.
 
 ```BASH
 nano .env
 ```
-Configure your api, weatherstaion id, lat and lon, and your home assistant access info
+Configure your API key, optional station ID, default lat/lon, and Home Assistant access:
 
 ```
 HA_URL=http:url_of_home_assistant_server:PORT
