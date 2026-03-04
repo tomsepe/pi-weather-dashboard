@@ -1,0 +1,89 @@
+{# In-browser screensaver: 3 min idle, then black screen + slow bouncing rainbow ball. Tap/move to dismiss. #}
+<div id="screensaver-overlay" class="screensaver-overlay" aria-hidden="true" hidden>
+    <div id="screensaver-ball" class="screensaver-ball"></div>
+</div>
+<style>
+    .screensaver-overlay {
+        position: fixed;
+        inset: 0;
+        background: #000;
+        z-index: 99999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: none;
+    }
+    .screensaver-overlay[hidden] { display: none !important; }
+    .screensaver-ball {
+        position: absolute;
+        width: 100px;
+        height: 100px;
+        border-radius: 50%;
+        background: conic-gradient(from 0deg, #e11, #fa0, #8a0, #0aa, #08f, #80f, #e11);
+        box-shadow: inset -8px -8px 20px rgba(0,0,0,0.3), inset 8px 8px 20px rgba(255,255,255,0.2);
+        will-change: transform;
+    }
+</style>
+<script>
+(function() {
+    var IDLE_MS = 3 * 60 * 1000;
+    var overlay = document.getElementById('screensaver-overlay');
+    var ball = document.getElementById('screensaver-ball');
+    var timer = null;
+    var animId = null;
+    var x = 100, y = 100, vx = 0.35, vy = 0.28;
+    var radius = 50;
+    var w = 800, h = 480;
+
+    function getSize() {
+        w = window.innerWidth;
+        h = window.innerHeight;
+    }
+
+    function resetIdle() {
+        if (timer) clearTimeout(timer);
+        timer = setTimeout(showScreensaver, IDLE_MS);
+    }
+
+    function showScreensaver() {
+        overlay.removeAttribute('hidden');
+        overlay.setAttribute('aria-hidden', 'false');
+        getSize();
+        x = radius + Math.random() * (w - 2 * radius);
+        y = radius + Math.random() * (h - 2 * radius);
+        if (animId) cancelAnimationFrame(animId);
+        animId = requestAnimationFrame(bounce);
+    }
+
+    function hideScreensaver() {
+        overlay.setAttribute('hidden', '');
+        overlay.setAttribute('aria-hidden', 'true');
+        if (animId) { cancelAnimationFrame(animId); animId = null; }
+        resetIdle();
+    }
+
+    function bounce() {
+        x += vx;
+        y += vy;
+        if (x <= radius) { x = radius; vx = -vx; }
+        if (x >= w - radius) { x = w - radius; vx = -vx; }
+        if (y <= radius) { y = radius; vy = -vy; }
+        if (y >= h - radius) { y = h - radius; vy = -vy; }
+        ball.style.left = (x - radius) + 'px';
+        ball.style.top = (y - radius) + 'px';
+        animId = requestAnimationFrame(bounce);
+    }
+
+    function onActivity() {
+        if (!overlay.hasAttribute('hidden')) hideScreensaver();
+        else resetIdle();
+    }
+
+    ['mousedown','mousemove','keydown','touchstart','click'].forEach(function(ev) {
+        document.addEventListener(ev, onActivity, { passive: true });
+    });
+
+    getSize();
+    resetIdle();
+})();
+</script>
