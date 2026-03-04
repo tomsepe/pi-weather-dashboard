@@ -26,6 +26,17 @@ def _ha_configured() -> bool:
     return bool(HA_URL and HA_ACCESS_TOKEN)
 
 
+@app.after_request
+def _disable_cache_for_dashboard(response):
+    """Prevent browsers from caching dashboard HTML so updates show after deploy."""
+    if request.path in ("/", "/5day", "/ha") and response.content_type and "text/html" in response.content_type:
+        response.cache_control.no_store = True
+        response.cache_control.no_cache = True
+        response.cache_control.must_revalidate = True
+        response.cache_control.max_age = 0
+    return response
+
+
 def _fetch_ha_state(entity_id: str) -> dict | None:
     """Fetch one entity state from HA. Returns state dict or None on error."""
     if not entity_id or not _ha_configured():
