@@ -1,4 +1,6 @@
 import os
+import random
+import re
 from flask import Flask, render_template, request, jsonify, redirect
 import requests
 import logging
@@ -24,6 +26,31 @@ HA_INSIDE_HUMIDITY_ENTITY = (os.environ.get("HA_INSIDE_HUMIDITY_ENTITY") or "").
 
 def _ha_configured() -> bool:
     return bool(HA_URL and HA_ACCESS_TOKEN)
+
+
+def _load_weather_quote() -> tuple[str, str] | None:
+    """Load weather_quotes.md, parse lines, return (quote_text, author) or None."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "weather_quotes.md")
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return None
+    # Format: N. "Quote." — **Author**
+    pattern = re.compile(r'^\d+\.\s*"([^"]+)"\s*[—\-]\s*\*\*([^*]+)\*\*')
+    quotes = []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        m = pattern.match(line)
+        if m:
+            quotes.append((m.group(1), m.group(2).strip()))
+    if not quotes:
+        return None
+    return random.choice(quotes)
 
 
 @app.after_request
@@ -302,11 +329,15 @@ def forecast_5day():
         if err is not None:
             return err
         forecast_icons = _forecast_icon_slugs(forecast)
+        quote = _load_weather_quote()
+        quote_text, quote_author = quote if quote else (None, None)
         return render_template(
             "dashboard_5day.html",
             forecast=forecast,
             forecast_note=None,
             forecast_icons=forecast_icons,
+            quote_text=quote_text,
+            quote_author=quote_author,
         )
     except Exception as e:
         log.exception("Unexpected error in 5-day forecast")
