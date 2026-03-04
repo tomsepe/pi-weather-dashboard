@@ -161,16 +161,23 @@ The kiosk needs a Wayland display. If you restart the service **over SSH**, the 
 
 - **Always run `./restart-kiosk.sh` (or `systemctl --user restart weather-kiosk.service`) from a terminal on the Pi desktop.**
 
-Check the kiosk log:
+### 4.1 Check the kiosk log
 
 ```bash
 cat /tmp/weather-kiosk.log
 ```
 
-- You should see `WAYLAND_DISPLAY=wayland-1` (or similar). If you see **WARNING: WAYLAND_DISPLAY is not set**, the restart was not done in a graphical session.
-- After “Launching Chromium...”, if Chromium exits immediately with a non-zero code, the log may show a Wayland or GPU error.
+- Look for `WAYLAND_DISPLAY=wayland-1` (or similar). If you see **WARNING: WAYLAND_DISPLAY is not set**, the service was started without a Wayland display—run the restart from a desktop terminal, not SSH.
+- Look for **Launching Chromium...** and the line after it. If Chromium exits with a non-zero code immediately, the log may show why (e.g. Wayland connection failed).
 
-More detail: **kiosk-setup.md** → “If the browser doesn’t relaunch after restart”.
+### 4.2 Check service status
+
+```bash
+systemctl --user status weather-kiosk.service
+```
+
+- If the service is **active (running)**, the script is running but Chromium may be failing to connect to Wayland. Check the log as above.
+- If the service is **failed**, read the status output and the end of `/tmp/weather-kiosk.log` for the error.
 
 ---
 
@@ -196,6 +203,12 @@ The line in the kiosk log containing `crashpad/snapshot/elf/elf_dynamic_array_re
 If the display turns off after a while:
 
 - **Raspberry Pi Configuration** → **Display** → set **Screen Blanking** to **Disabled**.
+
+---
+
+## 7. Why Wayland flags matter
+
+Chromium must use **`--ozone-platform=wayland`** so it uses the Pi’s GPU correctly under labwc. The `weather-kiosk.service` and `kiosk.sh` already set this. If you edit them, keep the Wayland flags or the browser may not display properly.
 
 ---
 
