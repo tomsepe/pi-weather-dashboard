@@ -1,9 +1,6 @@
-### Pi Weather Dashboard
+# Pi Weather Dashboard
 
-**README.md**
-
-# Tiny House Weather Dashboard  
-A standalone, kiosk-mode weather dashboard for the Raspberry Pi 4 & 7" Touchscreen. Choose your location (city name, latitude/longitude) in the in-app **Settings** page. Optionally use a **Vevor 7-in-1** (or other) personal weather station for live “Outside” conditions via the Weather Underground API; otherwise the app uses location-based current conditions and forecast from the same API.
+A standalone, kiosk-mode weather dashboard for the Raspberry Pi 4 & 7" Touchscreen, with **optional Home Assistant integration** for inside sensors and smart-home controls. Choose your location (city name, latitude/longitude) in the in-app **Settings** page. Optionally use a **Vevor 7-in-1** (or other) personal weather station for live “Outside” conditions via the Weather Underground API; otherwise the app uses location-based current conditions and forecast from the same API.
 
 ## 🛠 Tech Stack  
 * ****Hardware:**** Raspberry Pi 4, 7" DSI Touchscreen; optional Vevor or other PWS.  
@@ -39,9 +36,10 @@ pi-weather-dashboard/
 ---
 ## **🚀 Setup & Installation**
 
-For full step-by-step instructions (static IP, API config, Docker install, backend launch, kiosk mode), see **[SETUP.md](SETUP.md)**.
+- **[SETUP.md](SETUP.md)** — Full step-by-step instructions: static IP, API config, Docker install, backend launch, and kiosk overview.
+- **[kiosk-setup.md](kiosk-setup.md)** — Kiosk install on the Pi: systemd service + labwc autostart, or script-only; restart without reboot.
 
-**Quick summary:** Configure `.env` with your Weather.com API key and optional `LAT_LON`; set **location**, **Vevor on/off**, and **screensaver** in the app’s **Settings** page (gear icon). Run the app with `docker compose up -d`; use **kiosk-setup.md** for kiosk mode on the Pi.
+**Quick summary:** Configure `.env` with your Weather.com API key and optional `LAT_LON`; set **location**, **Vevor on/off**, and **screensaver** in the app’s **Settings** page (gear icon). Run the app with `docker compose up -d`; then follow **kiosk-setup.md** for kiosk mode on the Pi.
 
 ## **Dashboard Layout**
 
@@ -52,23 +50,12 @@ For full step-by-step instructions (static IP, API config, Docker install, backe
 
 ## **🛠 Troubleshooting**
 
-* **Backend logs:** `docker logs -f pi_weather_dashboard` — API errors and missing `observations` are logged here. Use this to see Inside sensor fetch results and any HA errors.
-* **Weather API "No observations":** If the dashboard shows "Weather data unavailable", check the backend logs for the API response. Often invalid API key or station ID; fix in `.env` and restart the container (`docker-compose restart`).
-* **Inside sensor shows unavailable:**  
-  1. **Check logs:** `docker logs pi_weather_dashboard 2>&1 | tail -50` — look for lines like `Inside sensor: temp=... humidity=...` or `Inside sensor: HA entity ... returned 404`.  
-  2. **Test the HA connection:** From the Pi (or any machine that can reach the app), run:  
-     `curl -s http://localhost:5000/api/debug/inside-sensor`  
-     This returns JSON with the entity IDs in use, each entity’s HTTP status, raw `state` from Home Assistant, and the parsed value. If `status_code` is 404, the entity ID is wrong (check **Settings → Devices & services** or **Developer tools → States** in HA). If `state` is `"unavailable"` or `"unknown"`, the device is offline or not reporting. Fix `.env` and restart the container (`docker-compose restart`).
-* **Kiosk log:** On the Pi, `cat /tmp/weather-kiosk.log` — Chromium and script output.
-* **Kiosk not displaying?** Boot must be **Desktop** (or Desktop Autologin). See **kiosk-debug.md** for autostart, manual run, keyring popup, and Chromium install.  
-* **Restart kiosk without reboot:** Use the systemd service (Option A in Step 3). Run `./restart-kiosk.sh` from a **terminal on the Pi desktop** (not SSH) so the restarted browser has Wayland. The script shows service status and the last 20 lines of the kiosk log.
-* **Browser doesn’t relaunch after restart:** See **kiosk-setup.md** (“If the browser doesn’t relaunch after restart”). Check `cat /tmp/weather-kiosk.log` for `WAYLAND_DISPLAY` (should be set) and any errors after “Launching Chromium...”.  
-* **Screen blanking:** Disable via *Raspberry Pi Configuration > Display* to keep the dashboard on 24/7.
+For step-by-step kiosk and backend debugging (blank screen, browser won't start, stale data, "Weather data unavailable", Inside sensor, Wayland, logs), see **[kiosk-debug.md](kiosk-debug.md)**.
 
 ## **🎨 Future Customization**
 
 * Add touch buttons for "Reboot" or "Screen Off."
-* Integrate Home Assistant sensors for internal Tiny House battery/solar status.
+* Integrate Home Assistant sensors for battery/solar status.
 
 ---
 

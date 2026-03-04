@@ -1,5 +1,9 @@
 # Kiosk setup (Trixie / Wayland / labwc)
 
+**Prerequisites:** Backend running (`docker compose up -d` from the project directory) and Pi set to boot to **Desktop** (or Desktop Autologin). See **[SETUP.md](SETUP.md)** for full setup.
+
+---
+
 ## Option A: Systemd user service (recommended)
 
 You can **restart the kiosk without rebooting** with `systemctl --user restart weather-kiosk` or `./restart-kiosk.sh`.

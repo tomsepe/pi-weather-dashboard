@@ -39,10 +39,10 @@ sudo nmcli connection modify "netplan-eth0" ipv4.method auto
 ### Apply changes
 
 ```bash
-sudo nmcli connection up "RR_IoT"
+sudo nmcli connection up "netplan-wlan0-RR_IoT"
 ```
 
-Replace `RR_IoT` with your connection name.
+Use the same connection name you used above (e.g. from `nmcli c show`).
 
 ---
 
@@ -82,7 +82,7 @@ HA_INSIDE_HUMIDITY_ENTITY=sensor.your_shelly_humidity
 - **WU_API_KEY** — Required for forecast (and for PWS if you use one).
 - **WU_STATION_ID** — Only if you use a personal weather station (e.g. Vevor).
 - **LAT_LON** — Default latitude,longitude used until you set them in Settings.
-- **HA_*** — For Home Assistant “Inside” panel and Controls page; see README for Shelly entity IDs.
+- **HA_*** — For Home Assistant “Inside” panel and Controls page. Entity IDs can be set in the app **Settings → HA** or in `.env`.
 
 ---
 
@@ -143,7 +143,7 @@ The dashboard is available at **http://localhost:5000** (or http://\<Pi-IP\>:500
 
 ## 5. Kiosk mode (Trixie / Wayland)
 
-On Raspberry Pi OS with **labwc**, the dashboard can start in kiosk mode (full-screen Chromium) on login.
+After the backend is running (section 4), you can run the dashboard in kiosk mode (full-screen Chromium) on the Pi. On Raspberry Pi OS with **labwc**, the kiosk can start automatically on login.
 
 - **Option A (recommended):** Install a systemd user service + labwc autostart so you can restart the kiosk with `./restart-kiosk.sh` without rebooting.
 - **Option B:** Copy `kiosk.sh` into labwc autostart only; to restart you must log out and back in (or reboot).
@@ -156,4 +156,4 @@ On Raspberry Pi OS with **labwc**, the dashboard can start in kiosk mode (full-s
 
 - Open the dashboard in a browser and go to **Settings** (gear icon) to set location, Vevor, and screensaver.
 - Use **Save and refresh kiosk** to apply settings and reload the dashboard without rebooting the Pi.
-- Troubleshooting: see **README.md** (Troubleshooting) and **kiosk-debug.md** (kiosk issues).
+- Troubleshooting: see **[kiosk-debug.md](kiosk-debug.md)** (kiosk and backend debugging).

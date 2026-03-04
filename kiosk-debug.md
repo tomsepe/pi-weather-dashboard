@@ -212,4 +212,4 @@ Chromium must use **`--ozone-platform=wayland`** so it uses the Pi’s GPU corre
 
 ---
 
-For installation and service setup, see **kiosk-setup.md**. For API/backend and Inside sensor issues, see the **Troubleshooting** section in **README.md**.
+For installation and service setup, see **kiosk-setup.md**. API/backend and Inside sensor issues are covered in [section 1](#1-dashboard-not-updating-stale-data-or-weather-data-unavailable) and the debug endpoint above.
