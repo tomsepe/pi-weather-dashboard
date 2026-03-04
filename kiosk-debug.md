@@ -63,7 +63,11 @@ docker compose up -d
 
 # 4. Confirm it’s running
 docker ps
+
+# 5. Restart Kiosk
+./restart-kiosk.sh
 ```
+
 
 **Verify the backend:**
 
@@ -80,7 +84,7 @@ After recreating, wait a few seconds and reload the dashboard in the kiosk (or r
 **Quick one-liner (full recreate with rebuild):**
 
 ```bash
-cd ~/pi-weather-dashboard && docker compose down && docker compose build --no-cache && docker compose up -d
+cd ~/pi-weather-dashboard && docker compose down && docker compose build --no-cache && docker compose up -d && ./restart-kiosk.sh
 ```
 
 ---
