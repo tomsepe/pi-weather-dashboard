@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect
 import requests
 import logging
 
@@ -236,6 +236,12 @@ def index():
             str(e) + " Check docker logs for full traceback.",
             500,
         )
+
+
+@app.route("/10day")
+def redirect_10day_to_5day():
+    """Redirect old /10day links to /5day (10-day API often returns 401 on free keys)."""
+    return redirect("/5day", code=302)
 
 
 @app.route("/5day")
