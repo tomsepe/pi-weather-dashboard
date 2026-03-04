@@ -17,10 +17,64 @@ LAT_LON = os.environ.get("LAT_LON")
 # Home Assistant: long-lived token at http://HA_URL/profile; token stays server-side.
 HA_URL = (os.environ.get("HA_URL") or "").rstrip("/")
 HA_ACCESS_TOKEN = os.environ.get("HA_ACCESS_TOKEN") or ""
+# Shelly (or other) temp/humidity sensor entity IDs for "Inside" on dashboard (e.g. sensor.shelly_plus_ht_xxx_temperature).
+HA_INSIDE_TEMP_ENTITY = (os.environ.get("HA_INSIDE_TEMP_ENTITY") or "").strip()
+HA_INSIDE_HUMIDITY_ENTITY = (os.environ.get("HA_INSIDE_HUMIDITY_ENTITY") or "").strip()
 
 
 def _ha_configured() -> bool:
     return bool(HA_URL and HA_ACCESS_TOKEN)
+
+
+def _fetch_ha_state(entity_id: str) -> dict | None:
+    """Fetch one entity state from HA. Returns state dict or None on error."""
+    if not entity_id or not _ha_configured():
+        return None
+    url = f"{HA_URL}/api/states/{entity_id}"
+    try:
+        r = requests.get(url, headers=_ha_headers(), timeout=5)
+        if r.status_code != 200:
+            log.warning("HA entity %s returned %s", entity_id, r.status_code)
+            return None
+        return r.json()
+    except requests.RequestException as e:
+        log.warning("HA fetch %s failed: %s", entity_id, e)
+        return None
+
+
+def _parse_number(state: dict | None) -> float | None:
+    """Parse state or attribute as number. state['state'] or state['attributes'].value."""
+    if not state or not isinstance(state, dict):
+        return None
+    raw = state.get("state")
+    if raw is not None and raw != "unavailable" and raw != "unknown":
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            pass
+    return None
+
+
+def _fetch_inside_sensors() -> tuple[float | None, float | None]:
+    """Return (inside_temp, inside_humidity) from HA entities. (None, None) if not configured or error."""
+    temp_val, humidity_val = None, None
+    if HA_INSIDE_TEMP_ENTITY:
+        s = _fetch_ha_state(HA_INSIDE_TEMP_ENTITY)
+        temp_val = _parse_number(s)
+        # Single entity may expose humidity in attributes (e.g. Shelly Plus H&T)
+        if s and not HA_INSIDE_HUMIDITY_ENTITY:
+            attrs = s.get("attributes") or {}
+            for key in ("humidity", "current_humidity"):
+                if key in attrs and attrs[key] is not None:
+                    try:
+                        humidity_val = float(attrs[key])
+                    except (TypeError, ValueError):
+                        pass
+                    break
+    if HA_INSIDE_HUMIDITY_ENTITY:
+        s = _fetch_ha_state(HA_INSIDE_HUMIDITY_ENTITY)
+        humidity_val = _parse_number(s)
+    return temp_val, humidity_val
 
 
 def _mask_key(key: str) -> str:
@@ -134,7 +188,18 @@ def index():
         if err is not None:
             return err
 
-        return render_template("dashboard.html", current=current, forecast=forecast)
+        # 3. Inside temp/humidity from Home Assistant (Shelly or other)
+        inside_temp, inside_humidity = _fetch_inside_sensors()
+        inside_configured = bool(HA_INSIDE_TEMP_ENTITY or HA_INSIDE_HUMIDITY_ENTITY)
+
+        return render_template(
+            "dashboard.html",
+            current=current,
+            forecast=forecast,
+            inside_temp=inside_temp,
+            inside_humidity=inside_humidity,
+            inside_configured=inside_configured,
+        )
 
     except requests.RequestException as e:
         log.exception("Network error calling weather APIs")
