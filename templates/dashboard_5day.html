@@ -5,14 +5,14 @@
     <style>
         body { background: #000; color: #fff; font-family: sans-serif; margin: 0; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
         .header { padding: 8px 20px; background: #111; border-bottom: 1px solid #333; font-size: 18px; color: #ff9f0a; text-transform: uppercase; flex-shrink: 0; }
-        .forecast-note { padding: 4px 20px; background: #1a1a1a; color: #888; font-size: 12px; flex-shrink: 0; }
+        .forecast-note { padding: 4px 20px; background: #1a1a1a; color: #888; font-size: 14px; flex-shrink: 0; }
         .list { flex: 1; overflow: hidden; padding: 4px 20px; display: flex; flex-direction: column; min-height: 0; }
-        .forecast-row { display: grid; grid-template-columns: 32px 1.2fr 1fr 2fr; gap: 8px; align-items: center; padding: 4px 0; border-bottom: 1px solid #222; font-size: 16px; flex: 1; min-height: 0; }
+        .forecast-row { display: grid; grid-template-columns: 32px 1.2fr 1fr 2fr; gap: 8px; align-items: center; padding: 2px 0; border-bottom: 1px solid #222; font-size: 16px; flex: 1; min-height: 0; }
         .forecast-row .day-icon { width: 26px; height: 26px; flex-shrink: 0; }
         .forecast-row .day-icon svg { width: 100%; height: 100%; }
         .forecast-row .day { color: #ff9f0a; font-weight: bold; }
         .forecast-row .temps { color: #ccc; }
-        .forecast-row .narrative { color: #888; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+        .forecast-row .narrative { color: #888; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
         .nav { display: flex; gap: 12px; padding: 8px 20px; background: #111; border-top: 1px solid #333; flex-shrink: 0; }
         .nav a { display: inline-block; padding: 14px 28px; background: #333; color: #ff9f0a; text-decoration: none; font-size: 20px; font-weight: bold; border-radius: 8px; }
         .nav a:hover, .nav a.active { background: #ff9f0a; color: #000; }
