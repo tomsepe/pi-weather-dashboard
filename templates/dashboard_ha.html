@@ -4,12 +4,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { background: #000; color: #fff; font-family: sans-serif; margin: 0; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
-        .nav { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 20px; background: #111; border-top: 1px solid #333; }
-        .nav-left { display: flex; gap: 12px; }
+        .nav { display: flex; gap: 12px; padding: 12px 20px; background: #111; border-top: 1px solid #333; }
         .nav a { display: inline-block; padding: 14px 28px; background: #333; color: #ff9f0a; text-decoration: none; font-size: 20px; font-weight: bold; border-radius: 8px; }
         .nav a:hover, .nav a.active { background: #ff9f0a; color: #000; }
-        .nav .nav-settings { margin-left: auto; padding: 14px; }
-        .nav .nav-settings svg { width: 28px; height: 28px; vertical-align: middle; }
         .content { flex: 1; overflow-y: auto; padding: 16px; }
         .ha-unconfigured { color: #888; font-size: 18px; padding: 20px; }
         .controls-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
@@ -29,25 +26,24 @@
         .control-card input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #ff9f0a; cursor: pointer; border: none; }
         .error-msg { color: #c00; padding: 10px 0; }
         .loading { color: #888; padding: 20px; }
+        .picker-link { margin: 0 0 12px 0; }
+        .picker-link a { color: #ff9f0a; text-decoration: none; font-size: 14px; }
+        .picker-link a:hover { text-decoration: underline; }
     </style>
     <meta http-equiv="refresh" content="300">
 </head>
 <body>
     <nav class="nav">
-        <div class="nav-left">
-            <a href="/">Home</a>
-            <a href="/5day">5 Day</a>
-            <a href="/ha" class="active">Controls</a>
-        </div>
-        <a href="/settings" class="nav-settings" title="Settings" aria-label="Settings">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
-        </a>
+        <a href="/">Home</a>
+        <a href="/5day">5 Day</a>
+        <a href="/ha" class="active">Controls</a>
     </nav>
     <div class="content">
         {% if not ha_configured %}
         <div class="ha-unconfigured">Home Assistant not configured. Set HA_URL and HA_ACCESS_TOKEN in the environment.</div>
         {% else %}
         <div id="controls-root">
+            <p class="picker-link"><a href="/ha/settings">Choose which controls to show</a></p>
             <div class="loading" id="loading">Loading…</div>
             <div class="error-msg" id="error" style="display: none;"></div>
             <div class="controls-grid" id="controls" style="display: none;"></div>
@@ -80,7 +76,7 @@
     function renderStates(states) {
         var container = document.getElementById('controls');
         var loading = document.getElementById('loading');
-        states = (states || []).filter(function(s) { return !isExcluded(s); });
+        states = states || [];
         if (states.length === 0) {
             loading.textContent = 'No lights or fans found.';
             container.style.display = 'none';
@@ -168,26 +164,38 @@
 
     function fetchStates() {
         var q = '?domain=' + DOMAINS.join(',');
-        fetch('/api/ha/states' + q)
-            .then(function(r) {
+        Promise.all([
+            fetch('/api/ha/states' + q).then(function(r) {
                 if (!r.ok) return r.json().then(function(j) { throw new Error(j.error || r.statusText); });
                 return r.json();
+            }),
+            fetch('/api/ha/dashboard-entities').then(function(r) {
+                if (!r.ok) return { visible_entity_ids: null };
+                return r.json();
             })
-            .then(function(states) {
-                showError('');
-                renderStates(states);
-            })
-            .catch(function(e) {
-                showError('Could not load states: ' + e.message);
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('controls').style.display = 'none';
-            });
+        ]).then(function(results) {
+            var states = results[0];
+            var config = results[1] || {};
+            var allowlist = config.visible_entity_ids;
+            if (allowlist && Array.isArray(allowlist) && allowlist.length > 0) {
+                var set = {};
+                allowlist.forEach(function(id) { set[id] = true; });
+                states = (states || []).filter(function(s) { return set[s.entity_id]; });
+            } else {
+                states = (states || []).filter(function(s) { return !isExcluded(s); });
+            }
+            showError('');
+            renderStates(states);
+        }).catch(function(e) {
+            showError('Could not load states: ' + e.message);
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('controls').style.display = 'none';
+        });
     }
 
     fetchStates();
     setInterval(fetchStates, POLL_SEC * 1000);
 })();
     </script>
-    {% include '_screensaver.html' %}
 </body>
 </html>
