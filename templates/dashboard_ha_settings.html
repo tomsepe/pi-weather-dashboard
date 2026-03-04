@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { background: #000; color: #fff; font-family: sans-serif; margin: 0; overflow: hidden; display: flex; flex-direction: column; height: 100vh; }
+        .nav { display: flex; gap: 12px; padding: 12px 20px; background: #111; border-top: 1px solid #333; flex-wrap: wrap; }
+        .nav a { display: inline-block; padding: 14px 28px; background: #333; color: #ff9f0a; text-decoration: none; font-size: 20px; font-weight: bold; border-radius: 8px; }
+        .nav a:hover, .nav a.active { background: #ff9f0a; color: #000; }
+        .content { flex: 1; overflow-y: auto; padding: 16px; }
+        .ha-unconfigured { color: #888; font-size: 18px; padding: 20px; }
+        .section { margin-bottom: 24px; }
+        .section h2 { color: #ff9f0a; font-size: 18px; margin: 0 0 10px 0; }
+        .entity-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #222; }
+        .entity-row label { display: flex; align-items: center; gap: 8px; cursor: pointer; flex: 1; }
+        .entity-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: #ff9f0a; }
+        .entity-name { color: #fff; font-weight: bold; }
+        .entity-id { color: #666; font-size: 12px; }
+        .section-actions { margin-top: 6px; }
+        .section-actions button { padding: 6px 12px; margin-right: 8px; background: #333; color: #ff9f0a; border: none; border-radius: 6px; cursor: pointer; font-size: 12px; }
+        .section-actions button:hover { background: #ff9f0a; color: #000; }
+        .global-actions { margin-top: 20px; padding-top: 16px; border-top: 1px solid #333; }
+        .global-actions button { padding: 12px 24px; margin-right: 10px; background: #333; color: #ff9f0a; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        .global-actions button:hover { background: #ff9f0a; color: #000; }
+        .global-actions button.primary { background: #ff9f0a; color: #000; }
+        .global-actions button.primary:hover { background: #e08d00; }
+        .loading { color: #888; padding: 20px; }
+        .error-msg { color: #c00; padding: 10px 0; }
+        .success-msg { color: #0a0; padding: 10px 0; }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/5day">5 Day</a>
+        <a href="/ha">Controls</a>
+        <a href="/ha/settings" class="active">Choose controls</a>
+    </nav>
+    <div class="content">
+        {% if not ha_configured %}
+        <div class="ha-unconfigured">Home Assistant not configured. Set HA_URL and HA_ACCESS_TOKEN in the environment.</div>
+        {% else %}
+        <div id="picker-root">
+            <div class="loading" id="loading">Loading entities…</div>
+            <div class="error-msg" id="error" style="display: none;"></div>
+            <div id="sections" style="display: none;"></div>
+            <div class="global-actions" id="global-actions" style="display: none;">
+                <button type="button" class="primary" id="btn-save">Save and go to Controls</button>
+                <button type="button" id="btn-reset">Reset to show all (use defaults)</button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    <script>
+(function() {
+    if (!document.getElementById('sections')) return;
+    var DOMAINS = ['light', 'switch', 'fan'];
+    var DOMAIN_LABELS = { light: 'Lights', switch: 'Switches', fan: 'Fans' };
+
+    function showError(msg) {
+        var el = document.getElementById('error');
+        el.textContent = msg || '';
+        el.style.display = msg ? 'block' : 'none';
+    }
+
+    function escapeHtml(s) {
+        var div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+    }
+
+    function render(states, visibleSet) {
+        var byDomain = {};
+        DOMAINS.forEach(function(d) { byDomain[d] = []; });
+        (states || []).forEach(function(s) {
+            var domain = (s.entity_id || '').split('.')[0];
+            if (byDomain[domain]) byDomain[domain].push(s);
+        });
+        var container = document.getElementById('sections');
+        container.innerHTML = '';
+        DOMAINS.forEach(function(domain) {
+            var list = byDomain[domain];
+            if (list.length === 0) return;
+            var section = document.createElement('div');
+            section.className = 'section';
+            var label = DOMAIN_LABELS[domain] || domain;
+            section.innerHTML = '<h2>' + escapeHtml(label) + '</h2><div class="section-actions"><button type="button" data-domain="' + escapeHtml(domain) + '" data-check="true">Select all</button><button type="button" data-domain="' + escapeHtml(domain) + '" data-check="false">Deselect all</button></div><div class="entity-list" data-domain="' + escapeHtml(domain) + '"></div>';
+            var listEl = section.querySelector('.entity-list');
+            list.forEach(function(s) {
+                var entityId = s.entity_id || '';
+                var name = (s.attributes && s.attributes.friendly_name) || entityId;
+                var checked = visibleSet[entityId];
+                var row = document.createElement('div');
+                row.className = 'entity-row';
+                row.innerHTML = '<label><input type="checkbox" data-entity-id="' + escapeHtml(entityId) + '" ' + (checked ? 'checked' : '') + '><span class="entity-name">' + escapeHtml(name) + '</span><span class="entity-id">' + escapeHtml(entityId) + '</span></label>';
+                listEl.appendChild(row);
+            });
+            section.querySelectorAll('.section-actions button').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    var check = btn.getAttribute('data-check') === 'true';
+                    listEl.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
+                        cb.checked = check;
+                    });
+                });
+            });
+            container.appendChild(section);
+        });
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('sections').style.display = 'block';
+        document.getElementById('global-actions').style.display = 'block';
+    }
+
+    function getVisibleSet(visibleIds) {
+        var set = {};
+        if (visibleIds && Array.isArray(visibleIds)) visibleIds.forEach(function(id) { set[id] = true; });
+        return set;
+    }
+
+    function getCheckedIds() {
+        var ids = [];
+        document.querySelectorAll('#sections input[type="checkbox"]:checked').forEach(function(cb) {
+            ids.push(cb.getAttribute('data-entity-id'));
+        });
+        return ids;
+    }
+
+    function load() {
+        var q = '?domain=' + DOMAINS.join(',');
+        Promise.all([
+            fetch('/api/ha/states' + q).then(function(r) {
+                if (!r.ok) return r.json().then(function(j) { throw new Error(j.error || r.statusText); });
+                return r.json();
+            }),
+            fetch('/api/ha/dashboard-entities').then(function(r) {
+                if (!r.ok) return { visible_entity_ids: null };
+                return r.json();
+            })
+        ]).then(function(results) {
+            var states = results[0];
+            var config = results[1] || {};
+            var visibleIds = config.visible_entity_ids;
+            var visibleSet = {};
+            if (visibleIds && Array.isArray(visibleIds) && visibleIds.length > 0) {
+                visibleIds.forEach(function(id) { visibleSet[id] = true; });
+            } else {
+                (states || []).forEach(function(s) { visibleSet[s.entity_id] = true; });
+            }
+            showError('');
+            render(states, visibleSet);
+        }).catch(function(e) {
+            showError('Could not load: ' + e.message);
+            document.getElementById('loading').style.display = 'none';
+        });
+    }
+
+    document.getElementById('btn-save').addEventListener('click', function() {
+        showError('');
+        var ids = getCheckedIds();
+        fetch('/api/ha/dashboard-entities', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ visible_entity_ids: ids })
+        }).then(function(r) {
+            if (!r.ok) return r.json().then(function(j) { throw new Error(j.error || r.statusText); });
+            window.location.href = '/ha';
+        }).catch(function(e) {
+            showError('Save failed: ' + e.message);
+        });
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', function() {
+        showError('');
+        fetch('/api/ha/dashboard-entities', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ visible_entity_ids: null })
+        }).then(function(r) {
+            if (!r.ok) return r.json().then(function(j) { throw new Error(j.error || r.statusText); });
+            window.location.href = '/ha';
+        }).catch(function(e) {
+            showError('Reset failed: ' + e.message);
+        });
+    });
+
+    load();
+})();
+    </script>
+</body>
+</html>

@@ -1,3 +1,4 @@
 .env
 config/settings.json
+ha_dashboard_entities.json
 pi4-dashboard-workspace.code-workspace
