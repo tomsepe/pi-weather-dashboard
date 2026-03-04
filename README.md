@@ -88,7 +88,13 @@ HA_ACCESS_TOKEN=your_token
 WU_API_KEY=your_api_key
 WU_STATION_ID=your_station_ID
 LAT_LON="44.05,-123.35"
+
+# Optional: "Inside" panel (Shelly temp/humidity or other HA sensor)
+HA_INSIDE_TEMP_ENTITY=sensor.your_shelly_temperature
+HA_INSIDE_HUMIDITY_ENTITY=sensor.your_shelly_humidity
 ```
+
+**Finding Shelly entity IDs:** In Home Assistant go to **Settings → Devices & services → Shelly** (or **Entities**), find your temperature/humidity device, and copy the entity IDs (e.g. `sensor.shelly_plus_ht_xxxx_temperature`, `sensor.shelly_plus_ht_xxxx_humidity`). Some devices expose one entity with both attributes—use that entity for both vars if needed.
 
 ---
 ## A) Docker Compose (recommended):
