@@ -18,11 +18,12 @@
         .form-group input[type="number"] { width: 100%; max-width: 280px; padding: 10px 12px; font-size: 16px; background: #222; border: 1px solid #444; border-radius: 6px; color: #fff; box-sizing: border-box; }
         .form-group input:focus { outline: none; border-color: #ff9f0a; }
         .form-group .hint { color: #666; font-size: 12px; margin-top: 4px; }
-        .form-group.checkbox { display: flex; align-items: center; gap: 10px; }
-        .form-group.checkbox input { width: 22px; height: 22px; accent-color: #ff9f0a; cursor: pointer; }
-        .form-group.checkbox label { margin-bottom: 0; text-transform: none; cursor: pointer; }
-        .form-group.radios label { display: block; margin: 8px 0; }
-        .form-group.radios input { margin-right: 8px; accent-color: #ff9f0a; }
+        .form-group.checkbox { display: flex; align-items: center; gap: 14px; user-select: none; -webkit-user-select: none; touch-action: manipulation; padding: 12px 0; }
+        .form-group.checkbox input { width: 40px; height: 40px; min-width: 40px; min-height: 40px; accent-color: #ff9f0a; cursor: pointer; flex-shrink: 0; }
+        .form-group.checkbox label { margin-bottom: 0; text-transform: none; cursor: pointer; font-size: 16px; padding: 8px 0; }
+        .form-group.radios { user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+        .form-group.radios label { display: flex; align-items: center; margin: 12px 0; padding: 8px 0; cursor: pointer; gap: 12px; }
+        .form-group.radios input { width: 32px; height: 32px; min-width: 32px; min-height: 32px; margin: 0; accent-color: #ff9f0a; flex-shrink: 0; }
         .actions { margin-top: 28px; display: flex; gap: 12px; flex-wrap: wrap; }
         .actions button { padding: 14px 24px; font-size: 18px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; }
         .btn-save { background: #333; color: #ff9f0a; }
@@ -66,7 +67,7 @@
                 <input type="checkbox" id="vevor_enabled" name="vevor_enabled" {% if vevor_enabled %}checked{% endif %}>
                 <label for="vevor_enabled">Enable Vevor / personal weather station</label>
             </div>
-            <div class="form-group hint">When disabled, current &quot;Outside&quot; conditions use your latitude/longitude instead.</div>
+            <div class="form-group hint">When disabled, the Outside section is hidden on the dashboard.</div>
             <div class="form-group checkbox">
                 <input type="checkbox" id="screensaver_enabled" name="screensaver_enabled" {% if screensaver_enabled %}checked{% endif %}>
                 <label for="screensaver_enabled">Enable screensaver</label>

@@ -438,6 +438,7 @@ def index():
             inside_temp=inside_temp,
             inside_humidity=inside_humidity,
             inside_configured=inside_configured,
+            show_outside=vevor_enabled,
             quote_text=quote_text,
             quote_author=quote_author,
             **ctx,
