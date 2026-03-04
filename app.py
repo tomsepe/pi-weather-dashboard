@@ -145,6 +145,57 @@ def _fetch_forecast(days: int):
     return forecast, None
 
 
+# Weather.com iconCode -> slug for 5-day icons (sunny, partly-cloudy, cloudy, rainy)
+# Codes: 1=Sunny, 2=Mostly Sunny, 3=Partly Cloudy, 4=Intermittent Clouds, 5=Hazy, 6-8=Cloudy/Mostly/Overcast,
+# 11=Fog, 12-18=Showers/Rain/T-storms, 19-26,29=Snow/Flurries/Ice/Sleet, 33-34=Clear/Mostly Clear, 35-44=night/variants
+_ICON_CODE_TO_SLUG = {
+    **{c: "sunny" for c in (1, 2, 33, 34, 30)},
+    **{c: "partly-cloudy" for c in (3, 4, 5, 35, 36, 37)},
+    **{c: "cloudy" for c in (6, 7, 8, 11, 38)},
+    **{c: "rainy" for c in (12, 13, 14, 15, 16, 17, 18, 39, 40, 41, 42)},
+    **{c: "snowy" for c in (19, 20, 22, 23, 24, 25, 26, 29, 43, 44)},
+}
+
+
+def _narrative_to_icon_slug(narrative: str | None) -> str:
+    """Derive icon slug from narrative text when iconCode not available."""
+    if not narrative:
+        return "cloudy"
+    n = narrative.lower()
+    if "rain" in n or "shower" in n or "storm" in n or "thunder" in n:
+        return "rainy"
+    if "snow" in n or "flurr" in n or "sleet" in n or "ice" in n:
+        return "snowy"
+    if "sun" in n or "clear" in n:
+        return "sunny"
+    if "partly" in n or "partially" in n or "intermittent" in n:
+        return "partly-cloudy"
+    if "cloud" in n or "overcast" in n or "fog" in n or "haze" in n:
+        return "cloudy"
+    return "cloudy"
+
+
+def _forecast_icon_slugs(forecast: dict) -> list[str]:
+    """Return list of icon slugs (one per day) for the 5-day forecast."""
+    days = forecast.get("dayOfWeek") or []
+    narratives = forecast.get("narrative") or []
+    icon_codes = forecast.get("iconCode")
+    if not isinstance(icon_codes, list):
+        icon_codes = None
+    slugs = []
+    for i in range(len(days)):
+        if icon_codes and i < len(icon_codes) and icon_codes[i] is not None:
+            try:
+                code = int(icon_codes[i])
+                slug = _ICON_CODE_TO_SLUG.get(code, "cloudy")
+            except (TypeError, ValueError):
+                slug = _narrative_to_icon_slug(narratives[i] if i < len(narratives) else None)
+        else:
+            slug = _narrative_to_icon_slug(narratives[i] if i < len(narratives) else None)
+        slugs.append(slug)
+    return slugs
+
+
 @app.route("/")
 def index():
     try:
@@ -250,7 +301,13 @@ def forecast_5day():
         forecast, err = _fetch_forecast(5)
         if err is not None:
             return err
-        return render_template("dashboard_5day.html", forecast=forecast, forecast_note=None)
+        forecast_icons = _forecast_icon_slugs(forecast)
+        return render_template(
+            "dashboard_5day.html",
+            forecast=forecast,
+            forecast_note=None,
+            forecast_icons=forecast_icons,
+        )
     except Exception as e:
         log.exception("Unexpected error in 5-day forecast")
         return _error_page(
