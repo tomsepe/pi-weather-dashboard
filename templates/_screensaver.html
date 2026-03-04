@@ -1,6 +1,12 @@
 {# In-browser screensaver: 3 min idle, then black screen + slow bouncing rainbow ball. Tap/move to dismiss. #}
 <div id="screensaver-overlay" class="screensaver-overlay" aria-hidden="true" hidden>
     <div id="screensaver-ball" class="screensaver-ball"></div>
+    <div id="screensaver-quote" class="screensaver-quote">
+        {% if quote_text is defined and quote_text %}
+        <p class="screensaver-quote-text">"{{ quote_text }}"</p>
+        {% if quote_author %}<p class="screensaver-quote-author">— {{ quote_author }}</p>{% endif %}
+        {% endif %}
+    </div>
 </div>
 <style>
     .screensaver-overlay {
@@ -22,6 +28,26 @@
         background: conic-gradient(from 0deg, #e11, #fa0, #8a0, #0aa, #08f, #80f, #e11);
         box-shadow: inset -8px -8px 20px rgba(0,0,0,0.3), inset 8px 8px 20px rgba(255,255,255,0.2);
         will-change: transform;
+    }
+    .screensaver-quote {
+        position: absolute;
+        bottom: 28px;
+        left: 20px;
+        right: 20px;
+        text-align: center;
+        pointer-events: none;
+    }
+    .screensaver-quote-text {
+        color: #666;
+        font-size: 15px;
+        font-style: italic;
+        margin: 0;
+        line-height: 1.4;
+    }
+    .screensaver-quote-author {
+        color: #444;
+        font-size: 13px;
+        margin-top: 6px;
     }
 </style>
 <script>
@@ -82,6 +108,23 @@
     ['mousedown','mousemove','keydown','touchstart','click'].forEach(function(ev) {
         document.addEventListener(ev, onActivity, { passive: true });
     });
+
+    var QUOTE_REFRESH_MS = 5 * 60 * 1000;
+    var quoteEl = document.getElementById('screensaver-quote');
+    function refreshQuote() {
+        fetch('/api/random-quote').then(function(r) { return r.json(); }).then(function(data) {
+            if (data.quote_text && quoteEl) {
+                quoteEl.innerHTML = '<p class="screensaver-quote-text">"' + escapeHtml(data.quote_text) + '"</p>' +
+                    (data.quote_author ? '<p class="screensaver-quote-author">— ' + escapeHtml(data.quote_author) + '</p>' : '');
+            }
+        }).catch(function() {});
+    }
+    function escapeHtml(s) {
+        var div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
+    }
+    setInterval(refreshQuote, QUOTE_REFRESH_MS);
 
     getSize();
     resetIdle();

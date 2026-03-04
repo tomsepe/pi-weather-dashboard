@@ -291,6 +291,8 @@ def index():
         inside_temp, inside_humidity = _fetch_inside_sensors()
         inside_configured = bool(HA_INSIDE_TEMP_ENTITY or HA_INSIDE_HUMIDITY_ENTITY)
 
+        quote = _load_weather_quote()
+        quote_text, quote_author = quote if quote else (None, None)
         return render_template(
             "dashboard.html",
             current=current,
@@ -298,6 +300,8 @@ def index():
             inside_temp=inside_temp,
             inside_humidity=inside_humidity,
             inside_configured=inside_configured,
+            quote_text=quote_text,
+            quote_author=quote_author,
         )
 
     except requests.RequestException as e:
@@ -391,6 +395,16 @@ def debug_inside_sensor():
     return jsonify(payload)
 
 
+@app.route("/api/random-quote")
+def api_random_quote():
+    """Return a random weather quote for the screensaver (refreshes every 5 min client-side)."""
+    quote = _load_weather_quote()
+    if not quote:
+        return jsonify({"quote_text": None, "quote_author": None})
+    quote_text, quote_author = quote
+    return jsonify({"quote_text": quote_text, "quote_author": quote_author})
+
+
 # --- Home Assistant proxy (token never sent to browser) ---
 
 def _ha_headers():
@@ -458,9 +472,13 @@ def ha_service():
 @app.route("/ha")
 def ha_dashboard():
     """Third page: Home Assistant controls. Token not in template."""
+    quote = _load_weather_quote()
+    quote_text, quote_author = quote if quote else (None, None)
     return render_template(
         "dashboard_ha.html",
         ha_configured=_ha_configured(),
+        quote_text=quote_text,
+        quote_author=quote_author,
     )
 
 
