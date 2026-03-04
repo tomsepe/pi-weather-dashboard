@@ -26,6 +26,9 @@
         .control-card input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #ff9f0a; cursor: pointer; border: none; }
         .error-msg { color: #c00; padding: 10px 0; }
         .loading { color: #888; padding: 20px; }
+        .picker-link { margin: 0 0 12px 0; }
+        .picker-link a { color: #ff9f0a; text-decoration: none; font-size: 14px; }
+        .picker-link a:hover { text-decoration: underline; }
     </style>
     <meta http-equiv="refresh" content="300">
 </head>
@@ -40,6 +43,7 @@
         <div class="ha-unconfigured">Home Assistant not configured. Set HA_URL and HA_ACCESS_TOKEN in the environment.</div>
         {% else %}
         <div id="controls-root">
+            <p class="picker-link"><a href="/ha/settings">Choose which controls to show</a></p>
             <div class="loading" id="loading">Loading…</div>
             <div class="error-msg" id="error" style="display: none;"></div>
             <div class="controls-grid" id="controls" style="display: none;"></div>
@@ -72,7 +76,7 @@
     function renderStates(states) {
         var container = document.getElementById('controls');
         var loading = document.getElementById('loading');
-        states = (states || []).filter(function(s) { return !isExcluded(s); });
+        states = states || [];
         if (states.length === 0) {
             loading.textContent = 'No lights or fans found.';
             container.style.display = 'none';
@@ -160,20 +164,33 @@
 
     function fetchStates() {
         var q = '?domain=' + DOMAINS.join(',');
-        fetch('/api/ha/states' + q)
-            .then(function(r) {
+        Promise.all([
+            fetch('/api/ha/states' + q).then(function(r) {
                 if (!r.ok) return r.json().then(function(j) { throw new Error(j.error || r.statusText); });
                 return r.json();
+            }),
+            fetch('/api/ha/dashboard-entities').then(function(r) {
+                if (!r.ok) return { visible_entity_ids: null };
+                return r.json();
             })
-            .then(function(states) {
-                showError('');
-                renderStates(states);
-            })
-            .catch(function(e) {
-                showError('Could not load states: ' + e.message);
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('controls').style.display = 'none';
-            });
+        ]).then(function(results) {
+            var states = results[0];
+            var config = results[1] || {};
+            var allowlist = config.visible_entity_ids;
+            if (allowlist && Array.isArray(allowlist) && allowlist.length > 0) {
+                var set = {};
+                allowlist.forEach(function(id) { set[id] = true; });
+                states = (states || []).filter(function(s) { return set[s.entity_id]; });
+            } else {
+                states = (states || []).filter(function(s) { return !isExcluded(s); });
+            }
+            showError('');
+            renderStates(states);
+        }).catch(function(e) {
+            showError('Could not load states: ' + e.message);
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('controls').style.display = 'none';
+        });
     }
 
     fetchStates();

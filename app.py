@@ -1,6 +1,8 @@
+import json
 import os
 import random
 import re
+import tempfile
 from flask import Flask, render_template, request, jsonify, redirect
 import requests
 import logging
@@ -22,10 +24,48 @@ HA_ACCESS_TOKEN = os.environ.get("HA_ACCESS_TOKEN") or ""
 # Shelly (or other) temp/humidity sensor entity IDs for "Inside" on dashboard (e.g. sensor.shelly_plus_ht_xxx_temperature).
 HA_INSIDE_TEMP_ENTITY = (os.environ.get("HA_INSIDE_TEMP_ENTITY") or "").strip()
 HA_INSIDE_HUMIDITY_ENTITY = (os.environ.get("HA_INSIDE_HUMIDITY_ENTITY") or "").strip()
+# Path to JSON file storing which HA entities to show on dashboard (null = use default: domains minus EXCLUDED).
+HA_DASHBOARD_ENTITIES_FILE = os.environ.get(
+    "HA_DASHBOARD_ENTITIES_FILE",
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "ha_dashboard_entities.json"),
+)
 
 
 def _ha_configured() -> bool:
     return bool(HA_URL and HA_ACCESS_TOKEN)
+
+
+def _load_ha_dashboard_entities() -> dict | None:
+    """Load visible_entity_ids from JSON file. Returns None if file missing/invalid (use default behavior)."""
+    if not os.path.isfile(HA_DASHBOARD_ENTITIES_FILE):
+        return None
+    try:
+        with open(HA_DASHBOARD_ENTITIES_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return None
+        return data
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def _save_ha_dashboard_entities(visible_entity_ids: list[str] | None) -> None:
+    """Persist visible_entity_ids to JSON file. None = reset to default."""
+    data = {"visible_entity_ids": visible_entity_ids}
+    try:
+        fd, path = tempfile.mkstemp(dir=os.path.dirname(HA_DASHBOARD_ENTITIES_FILE), prefix="ha_entities.", suffix=".json")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+            os.replace(path, HA_DASHBOARD_ENTITIES_FILE)
+        except Exception:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+            raise
+    except OSError as e:
+        log.warning("Could not save HA dashboard entities: %s", e)
 
 
 def _load_weather_quote() -> tuple[str, str] | None:
@@ -56,7 +96,7 @@ def _load_weather_quote() -> tuple[str, str] | None:
 @app.after_request
 def _disable_cache_for_dashboard(response):
     """Prevent browsers from caching dashboard HTML so updates show after deploy."""
-    if request.path in ("/", "/5day", "/ha") and response.content_type and "text/html" in response.content_type:
+    if request.path in ("/", "/5day", "/ha", "/ha/settings") and response.content_type and "text/html" in response.content_type:
         response.cache_control.no_store = True
         response.cache_control.no_cache = True
         response.cache_control.must_revalidate = True
@@ -455,11 +495,49 @@ def ha_service():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/ha/dashboard-entities", methods=["GET"])
+def ha_dashboard_entities_get():
+    """Return saved allowlist for dashboard: { visible_entity_ids: [...] } or null for default."""
+    if not _ha_configured():
+        return jsonify({"error": "HA not configured"}), 503
+    data = _load_ha_dashboard_entities()
+    if data is None:
+        return jsonify({"visible_entity_ids": None})
+    return jsonify({"visible_entity_ids": data.get("visible_entity_ids")})
+
+
+@app.route("/api/ha/dashboard-entities", methods=["PUT"])
+def ha_dashboard_entities_put():
+    """Save allowlist. Body: { visible_entity_ids: ["light.x", ...] } or null to reset to default."""
+    if not _ha_configured():
+        return jsonify({"error": "HA not configured"}), 503
+    payload = request.get_json(silent=True)
+    if payload is None:
+        visible = None
+    else:
+        visible = payload.get("visible_entity_ids")
+        if visible is not None and not isinstance(visible, list):
+            return jsonify({"error": "visible_entity_ids must be an array or null"}), 400
+        if visible is not None:
+            visible = [str(e).strip() for e in visible if str(e).strip()]
+    _save_ha_dashboard_entities(visible)
+    return jsonify({"visible_entity_ids": visible})
+
+
 @app.route("/ha")
 def ha_dashboard():
     """Third page: Home Assistant controls. Token not in template."""
     return render_template(
         "dashboard_ha.html",
+        ha_configured=_ha_configured(),
+    )
+
+
+@app.route("/ha/settings")
+def ha_dashboard_settings():
+    """Picker page: choose which HA entities appear on the dashboard."""
+    return render_template(
+        "dashboard_ha_settings.html",
         ha_configured=_ha_configured(),
     )
 
