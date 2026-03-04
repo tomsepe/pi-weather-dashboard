@@ -45,11 +45,13 @@ def _fetch_ha_state(entity_id: str) -> dict | None:
     try:
         r = requests.get(url, headers=_ha_headers(), timeout=5)
         if r.status_code != 200:
-            log.warning("HA entity %s returned %s", entity_id, r.status_code)
+            log.warning("Inside sensor: HA entity %s returned %s", entity_id, r.status_code)
             return None
-        return r.json()
+        data = r.json()
+        log.debug("Inside sensor: %s state=%s", entity_id, data.get("state"))
+        return data
     except requests.RequestException as e:
-        log.warning("HA fetch %s failed: %s", entity_id, e)
+        log.warning("Inside sensor: HA fetch %s failed: %s", entity_id, e)
         return None
 
 
@@ -69,9 +71,14 @@ def _parse_number(state: dict | None) -> float | None:
 def _fetch_inside_sensors() -> tuple[float | None, float | None]:
     """Return (inside_temp, inside_humidity) from HA entities. (None, None) if not configured or error."""
     temp_val, humidity_val = None, None
+    if not HA_INSIDE_TEMP_ENTITY and not HA_INSIDE_HUMIDITY_ENTITY:
+        log.debug("Inside sensor: no entity IDs configured (HA_INSIDE_TEMP_ENTITY, HA_INSIDE_HUMIDITY_ENTITY)")
+        return None, None
     if HA_INSIDE_TEMP_ENTITY:
         s = _fetch_ha_state(HA_INSIDE_TEMP_ENTITY)
         temp_val = _parse_number(s)
+        if temp_val is None and s is not None:
+            log.info("Inside sensor: temp entity %s state=%r (unparseable or unavailable)", HA_INSIDE_TEMP_ENTITY, s.get("state"))
         # Single entity may expose humidity in attributes (e.g. Shelly Plus H&T)
         if s and not HA_INSIDE_HUMIDITY_ENTITY:
             attrs = s.get("attributes") or {}
@@ -85,6 +92,9 @@ def _fetch_inside_sensors() -> tuple[float | None, float | None]:
     if HA_INSIDE_HUMIDITY_ENTITY:
         s = _fetch_ha_state(HA_INSIDE_HUMIDITY_ENTITY)
         humidity_val = _parse_number(s)
+        if humidity_val is None and s is not None:
+            log.info("Inside sensor: humidity entity %s state=%r (unparseable or unavailable)", HA_INSIDE_HUMIDITY_ENTITY, s.get("state"))
+    log.info("Inside sensor: temp=%s humidity=%s", temp_val, humidity_val)
     return temp_val, humidity_val
 
 
@@ -242,6 +252,49 @@ def forecast_5day():
             str(e) + " Check docker logs for full traceback.",
             500,
         )
+
+
+# --- Debug: Inside sensor (for troubleshooting) ---
+
+
+def _fetch_ha_state_debug(entity_id: str) -> dict:
+    """Fetch one HA entity and return status_code, state, parsed number, and any error (for debug API)."""
+    out = {"entity_id": entity_id, "status_code": None, "state": None, "parsed": None, "error": None}
+    if not entity_id or not _ha_configured():
+        out["error"] = "HA not configured or entity_id empty"
+        return out
+    url = f"{HA_URL}/api/states/{entity_id}"
+    try:
+        r = requests.get(url, headers=_ha_headers(), timeout=5)
+        out["status_code"] = r.status_code
+        if r.status_code != 200:
+            out["error"] = r.text[:200] if r.text else f"HTTP {r.status_code}"
+            return out
+        data = r.json()
+        out["state"] = data.get("state")
+        out["parsed"] = _parse_number(data)
+        return out
+    except requests.RequestException as e:
+        out["error"] = str(e)
+        return out
+
+
+@app.route("/api/debug/inside-sensor")
+def debug_inside_sensor():
+    """Return JSON with HA inside-sensor fetch details for troubleshooting. No secrets."""
+    payload = {
+        "configured": bool(HA_INSIDE_TEMP_ENTITY or HA_INSIDE_HUMIDITY_ENTITY),
+        "ha_configured": _ha_configured(),
+        "temp_entity": HA_INSIDE_TEMP_ENTITY or None,
+        "humidity_entity": HA_INSIDE_HUMIDITY_ENTITY or None,
+        "temp": None,
+        "humidity": None,
+    }
+    if HA_INSIDE_TEMP_ENTITY:
+        payload["temp"] = _fetch_ha_state_debug(HA_INSIDE_TEMP_ENTITY)
+    if HA_INSIDE_HUMIDITY_ENTITY:
+        payload["humidity"] = _fetch_ha_state_debug(HA_INSIDE_HUMIDITY_ENTITY)
+    return jsonify(payload)
 
 
 # --- Home Assistant proxy (token never sent to browser) ---

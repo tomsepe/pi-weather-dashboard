@@ -199,9 +199,14 @@ Trixie uses the **labwc** compositor. Full details are in **kiosk-setup.md**. Fo
 
 ## **🛠 Troubleshooting**
 
-* **Backend logs:** `docker logs -f pi_weather_dashboard` — API errors and missing `observations` are logged here.  
-* **Weather API "No observations":** If the dashboard shows "Weather data unavailable", check the backend logs for the API response. Often invalid API key or station ID; fix in `app.py` and restart the container (`docker-compose restart`).  
-* **Kiosk log:** On the Pi, `cat /tmp/weather-kiosk.log` — Chromium and script output.  
+* **Backend logs:** `docker logs -f pi_weather_dashboard` — API errors and missing `observations` are logged here. Use this to see Inside sensor fetch results and any HA errors.
+* **Weather API "No observations":** If the dashboard shows "Weather data unavailable", check the backend logs for the API response. Often invalid API key or station ID; fix in `.env` and restart the container (`docker-compose restart`).
+* **Inside sensor shows unavailable:**  
+  1. **Check logs:** `docker logs pi_weather_dashboard 2>&1 | tail -50` — look for lines like `Inside sensor: temp=... humidity=...` or `Inside sensor: HA entity ... returned 404`.  
+  2. **Test the HA connection:** From the Pi (or any machine that can reach the app), run:  
+     `curl -s http://localhost:5000/api/debug/inside-sensor`  
+     This returns JSON with the entity IDs in use, each entity’s HTTP status, raw `state` from Home Assistant, and the parsed value. If `status_code` is 404, the entity ID is wrong (check **Settings → Devices & services** or **Developer tools → States** in HA). If `state` is `"unavailable"` or `"unknown"`, the device is offline or not reporting. Fix `.env` and restart the container (`docker-compose restart`).
+* **Kiosk log:** On the Pi, `cat /tmp/weather-kiosk.log` — Chromium and script output.
 * **Kiosk not displaying?** Boot must be **Desktop** (or Desktop Autologin). See **kiosk-debug.md** for autostart, manual run, keyring popup, and Chromium install.  
 * **Restart kiosk without reboot:** Use the systemd service (Option A in Step 3). Run `./restart-kiosk.sh` from a **terminal on the Pi desktop** (not SSH) so the restarted browser has Wayland. The script shows service status and the last 20 lines of the kiosk log.
 * **Browser doesn’t relaunch after restart:** See **kiosk-setup.md** (“If the browser doesn’t relaunch after restart”). Check `cat /tmp/weather-kiosk.log` for `WAYLAND_DISPLAY` (should be set) and any errors after “Launching Chromium...”.  
